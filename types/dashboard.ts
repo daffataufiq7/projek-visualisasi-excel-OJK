@@ -1,15 +1,28 @@
 export interface DataPoint {
-  [key: string]: any;
+  indikator: string;
+  periode: string; // e.g. '2025-Jan' or '2023'
+  tahun: number;   // e.g. 2025
+  bulan: string | null;  // e.g. 'Jan' or null
+  nilai: number;
 }
 
 export interface SheetData {
   name: string;
-  data: DataPoint[];
-  columns: string[];
-  numericColumns: string[];
-  categoricalColumns: string[];
-  years: string[];
-  months: string[];
+  indicators: string[]; // List of unique indicators: ['Aset', 'Dana Pihak Ketiga', 'Kredit', 'NPL', 'LDR']
+  years: string[];      // ['2024', '2025', '2026']
+  months: string[];     // ['Jan', 'Mei', 'Des']
+  periods: string[];    // ['2024-Jan', '2024-Mei', ...]
+  rawPoints: DataPoint[]; // Flattened data list
+  indicatorsData: {     // Pivot representation: { 'Aset': { '2024-Jan': 120 } }
+    [indicatorName: string]: {
+      [period: string]: number;
+    }
+  };
+  // Grid format for backward compatibility in tables
+  data: { [key: string]: any }[]; // Each row: { indicator: 'Aset', '2024-Jan': 120, '2024-Mei': 125 }
+  columns: string[]; // ['indicator', '2024-Jan', '2024-Mei', ...]
+  numericColumns: string[]; // ['2024-Jan', '2024-Mei', ...]
+  categoricalColumns: string[]; // ['indicator']
 }
 
 export interface ActiveFile {
@@ -19,15 +32,18 @@ export interface ActiveFile {
   sheets: { [sheetName: string]: SheetData };
   activeSheetName: string;
   uploadDate: string;
-  rowCount: number; // sum of rows of all sheets
+  rowCount: number; // total raw data points across sheets
+  totalIndicators: number;
+  totalPeriods: number;
+  validationError?: string; // If validation failed, store details here
 }
 
 export interface FilterState {
   sheet: string;
   year: string; // 'All' or specific year
   month: string; // 'All' or specific month
-  xAxis: string;
-  yAxis: string[];
+  xAxis: string; // Will always be 'period'
+  yAxis: string[]; // Will hold selected indicators: ['Aset', 'Kredit']
   chartType: 'bar' | 'line' | 'area' | 'pie' | 'horizontal_bar';
 }
 
@@ -39,5 +55,7 @@ export interface UploadHistoryItem {
   rowCount: number;
   uploadDate: string;
   status: 'success' | 'failed';
+  errorMessage?: string;
   fileData: ActiveFile;
 }
+

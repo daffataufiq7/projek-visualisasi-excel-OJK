@@ -21,13 +21,13 @@ export default function Reports({ activeFile, filterState }: ReportsProps) {
   const activeSheetData = activeFile.sheets[filterState.sheet];
 
   const reportMetrics = useMemo(() => {
-    if (!activeSheetData || activeSheetData.data.length === 0) return [];
+    if (!activeSheetData || activeSheetData.indicators.length === 0) return [];
 
-    const numericCols = activeSheetData.numericColumns;
-    const xAxisCol = filterState.xAxis || activeSheetData.columns[0];
+    const indicators = activeSheetData.indicators;
+    const periods = activeSheetData.periods;
     const metrics: ColumnReport[] = [];
 
-    numericCols.forEach((colName) => {
+    indicators.forEach((indicatorName) => {
       let minVal = Infinity;
       let minLabel = '';
       let maxVal = -Infinity;
@@ -35,13 +35,13 @@ export default function Reports({ activeFile, filterState }: ReportsProps) {
       let sum = 0;
       let count = 0;
 
-      activeSheetData.data.forEach((row) => {
-        const val = Number(row[colName]);
-        if (!isNaN(val) && val !== null) {
+      periods.forEach((periodKey) => {
+        const val = activeSheetData.indicatorsData[indicatorName]?.[periodKey];
+        if (val !== undefined && val !== null) {
           sum += val;
           count++;
 
-          const label = String(row[xAxisCol] || 'Data');
+          const label = periodKey;
           if (val < minVal) {
             minVal = val;
             minLabel = label;
@@ -54,11 +54,11 @@ export default function Reports({ activeFile, filterState }: ReportsProps) {
       });
 
       const avgVal = count > 0 ? sum / count : 0;
-      const latestVal = count > 0 ? Number(activeSheetData.data[activeSheetData.data.length - 1][colName] || 0) : 0;
+      const latestVal = count > 0 ? (activeSheetData.indicatorsData[indicatorName]?.[periods[periods.length - 1]] ?? 0) : 0;
 
       if (count > 0) {
         metrics.push({
-          columnName: colName,
+          columnName: indicatorName,
           minVal: parseFloat(minVal.toFixed(2)),
           minLabel,
           maxVal: parseFloat(maxVal.toFixed(2)),
@@ -70,7 +70,7 @@ export default function Reports({ activeFile, filterState }: ReportsProps) {
     });
 
     return metrics;
-  }, [activeSheetData, filterState.xAxis]);
+  }, [activeSheetData]);
 
   const handlePrint = () => {
     window.print();

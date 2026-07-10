@@ -11,13 +11,14 @@ export function useDashboardState() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [filterState, setFilterState] = useState<FilterState>({
     sheet: '',
     year: 'All',
     month: 'All',
-    xAxis: '',
+    xAxis: 'period',
     yAxis: [],
-    chartType: 'bar',
+    chartType: 'line',
   });
 
   // Load initial mock file & history on mount
@@ -28,15 +29,14 @@ export function useDashboardState() {
     // Set default filter state based on mock file
     const firstSheetName = mockFile.sheetNames[0];
     const sheetData = mockFile.sheets[firstSheetName];
-    const defaultX = detectDefaultXAxis(sheetData);
     
     setFilterState({
       sheet: firstSheetName,
       year: 'All',
       month: 'All',
-      xAxis: defaultX,
-      yAxis: detectDefaultYAxis(sheetData, defaultX),
-      chartType: 'bar',
+      xAxis: 'period',
+      yAxis: sheetData.indicators,
+      chartType: 'line',
     });
 
     // Populate history with the default mock file
@@ -55,7 +55,6 @@ export function useDashboardState() {
     if (storedHistory) {
       try {
         const parsedHistory = JSON.parse(storedHistory) as UploadHistoryItem[];
-        // Filter out any older mock entries to avoid duplicates, and prepend the active one
         const cleanedHistory = parsedHistory.filter(h => h.id !== 'default-mock');
         setHistory([initialHistoryItem, ...cleanedHistory]);
       } catch (e) {
@@ -67,38 +66,12 @@ export function useDashboardState() {
     }
   }, []);
 
-  // Helper to detect default X-axis
-  function detectDefaultXAxis(sheetData: SheetData): string {
-    const cols = sheetData.columns;
-    // Prefer "Periode", "Bulan", "Tahun", "Tanggal"
-    const priority = ['periode', 'tanggal', 'date', 'bulan', 'month', 'tahun', 'year'];
-    for (const term of priority) {
-      const match = cols.find(c => c.toLowerCase() === term || c.toLowerCase().includes(term));
-      if (match) return match;
-    }
-    // Fallback to first categorical column
-    if (sheetData.categoricalColumns.length > 0) {
-      return sheetData.categoricalColumns[0];
-    }
-    // Universal fallback
-    return cols[0] || '';
-  }
-
-  // Helper to detect default Y-axis (ensures it is never empty)
-  function detectDefaultYAxis(sheetData: SheetData, defaultX: string): string[] {
-    if (sheetData.numericColumns.length > 0) {
-      return sheetData.numericColumns.slice(0, 3);
-    }
-    const fallback = sheetData.columns.filter(c => c !== defaultX);
-    return fallback.slice(0, 3);
-  }
-
   // Handle Excel Upload
   const handleUpload = async (file: File) => {
     setLoading(true);
     setUploadProgress(10);
+    setUploadError(null);
     
-    // Simulate upload progress
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
@@ -115,23 +88,20 @@ export function useDashboardState() {
       clearInterval(progressInterval);
       setUploadProgress(100);
       
-      // Delay slightly for visual effect
       setTimeout(() => {
         setActiveFile(parsedFile);
         
         // Reset filters for new file
         const firstSheet = parsedFile.sheetNames[0];
         const sheetData = parsedFile.sheets[firstSheet];
-        const defaultX = detectDefaultXAxis(sheetData);
-        const defaultY = detectDefaultYAxis(sheetData, defaultX);
 
         setFilterState({
           sheet: firstSheet,
           year: 'All',
           month: 'All',
-          xAxis: defaultX,
-          yAxis: defaultY,
-          chartType: 'bar',
+          xAxis: 'period',
+          yAxis: sheetData.indicators,
+          chartType: 'line',
         });
 
         // Add to history
@@ -163,7 +133,44 @@ export function useDashboardState() {
     } catch (error) {
       clearInterval(progressInterval);
       setLoading(false);
-      alert('Gagal memproses file Excel: ' + (error instanceof Error ? error.message : 'Format tidak didukung'));
+      const errMsg = error instanceof Error ? error.message : 'Format template tidak sesuai';
+      setUploadError(errMsg);
+      
+      // Save failed upload attempt in history for visibility
+      const failedItem: UploadHistoryItem = {
+        id: `${Date.now()}-${file.name}`,
+        name: file.name,
+        size: file.size,
+        sheetCount: 0,
+        rowCount: 0,
+        uploadDate: new Date().toLocaleDateString('id-ID', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        status: 'failed',
+        errorMessage: error instanceof Error ? error.message : 'Format template tidak sesuai',
+        fileData: {
+          name: file.name,
+          size: file.size,
+          sheetNames: [],
+          sheets: {},
+          activeSheetName: '',
+          uploadDate: new Date().toLocaleDateString('id-ID'),
+          rowCount: 0,
+          totalIndicators: 0,
+          totalPeriods: 0,
+          validationError: error instanceof Error ? error.message : 'Format template tidak sesuai'
+        }
+      };
+
+      const updatedHistory = [failedItem, ...history.filter(h => h.name !== file.name)];
+      setHistory(updatedHistory);
+      localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+
+      alert('Gagal memproses file Excel:\n' + (error instanceof Error ? error.message : 'Format tidak didukung'));
     }
   };
 
@@ -182,14 +189,13 @@ export function useDashboardState() {
       const mock = history.find(h => h.id === 'default-mock')?.fileData || generateMockFile();
       setActiveFile(mock);
       const sheet = mock.sheetNames[0];
-      const defaultX = detectDefaultXAxis(mock.sheets[sheet]);
       setFilterState({
         sheet,
         year: 'All',
         month: 'All',
-        xAxis: defaultX,
-        yAxis: detectDefaultYAxis(mock.sheets[sheet], defaultX),
-        chartType: 'bar',
+        xAxis: 'period',
+        yAxis: mock.sheets[sheet].indicators,
+        chartType: 'line',
       });
     }
   };
@@ -197,20 +203,21 @@ export function useDashboardState() {
   // Load File from History
   const loadHistoryItem = (id: string) => {
     const item = history.find(h => h.id === id);
-    if (item) {
+    if (item && item.status === 'success') {
       const file = item.fileData;
       setActiveFile(file);
       const sheet = file.sheetNames[0];
-      const defaultX = detectDefaultXAxis(file.sheets[sheet]);
       setFilterState({
         sheet,
         year: 'All',
         month: 'All',
-        xAxis: defaultX,
-        yAxis: detectDefaultYAxis(file.sheets[sheet], defaultX),
-        chartType: 'bar',
+        xAxis: 'period',
+        yAxis: file.sheets[sheet].indicators,
+        chartType: 'line',
       });
       setActiveTab('dashboard');
+    } else if (item && item.status === 'failed') {
+      alert(`File ini gagal diproses sebelumnya dengan error:\n${item.errorMessage}\n\nSilakan unggah kembali (upload ulang) file tersebut agar diproses oleh parser baru yang lebih fleksibel.`);
     }
   };
 
@@ -220,12 +227,11 @@ export function useDashboardState() {
     const sheetData = activeFile.sheets[sheetName];
     if (!sheetData) return;
 
-    const defaultX = detectDefaultXAxis(sheetData);
     setFilterState(prev => ({
       ...prev,
       sheet: sheetName,
-      xAxis: defaultX,
-      yAxis: detectDefaultYAxis(sheetData, defaultX),
+      xAxis: 'period',
+      yAxis: sheetData.indicators,
     }));
   };
 
@@ -236,6 +242,8 @@ export function useDashboardState() {
     sidebarCollapsed,
     loading,
     uploadProgress,
+    uploadError,
+    setUploadError,
     filterState,
     setActiveTab,
     setSidebarCollapsed,

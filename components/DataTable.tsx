@@ -12,7 +12,7 @@ import {
   ArrowUp, 
   ArrowDown 
 } from 'lucide-react';
-import { SheetData, DataPoint } from '../types/dashboard';
+import { SheetData } from '../types/dashboard';
 
 interface DataTableProps {
   sheetData: SheetData;
@@ -153,7 +153,7 @@ export default function DataTable({ sheetData }: DataTableProps) {
 
     // Filter properties to keep only visible columns
     const exportData = sortedData.map(row => {
-      const filteredRow: DataPoint = {};
+      const filteredRow: { [key: string]: any } = {};
       visibleColumns.forEach(col => {
         filteredRow[col] = row[col];
       });

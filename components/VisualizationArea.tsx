@@ -17,7 +17,7 @@ import {
   Legend, 
   Brush 
 } from 'recharts';
-import { Download, SlidersHorizontal, ZoomIn } from 'lucide-react';
+import { Download, ZoomIn, FileWarning } from 'lucide-react';
 import { ActiveFile, FilterState } from '../types/dashboard';
 
 interface VisualizationAreaProps {
@@ -29,53 +29,87 @@ interface VisualizationAreaProps {
 const CHART_COLORS = [
   '#C61E1E', // OJK Red
   '#1E293B', // Dark Slate
-  '#64748B', // Medium Slate
-  '#A31818', // Crimson Dark
-  '#E2E8F0', // Soft Gray
+  '#0284C7', // Sky Blue
+  '#0D9488', // Teal
+  '#8B5CF6', // Purple
+  '#F59E0B', // Amber
 ];
 
 export default function VisualizationArea({ activeFile, filterState }: VisualizationAreaProps) {
   const [showZoom, setShowZoom] = useState(false);
   
-  const activeSheetData = activeFile.sheets[filterState.sheet];
+  const activeSheetData = activeFile.sheets[filterState.sheet] || activeFile.sheets[activeFile.activeSheetName];
   
-  // Filter the data based on selected Year and Month
+  // Format and filter the data based on selected indicators, year, and month
   const filteredData = useMemo(() => {
     if (!activeSheetData) return [];
     
-    let result = [...activeSheetData.data];
+    const result: any[] = [];
     
-    // Filter by year if selected and exists
-    if (filterState.year !== 'All') {
-      // Look for year columns: "Tahun", "Year", or within Date/Periode
-      const yearCol = activeSheetData.columns.find(c => /tahun|year/i.test(c));
-      if (yearCol) {
-        result = result.filter(row => String(row[yearCol]) === filterState.year);
-      } else {
-        // Fallback search in all categorical keys
-        result = result.filter(row => {
-          return Object.values(row).some(val => String(val).includes(filterState.year));
-        });
+    activeSheetData.periods.forEach((periodKey) => {
+      const yr = periodKey.split('-')[0];
+      const mo = periodKey.split('-')[1];
+      
+      // Filter by year if selected
+      if (filterState.year !== 'All' && yr !== filterState.year) {
+        return;
       }
-    }
-
-    // Filter by month if selected and exists
-    if (filterState.month !== 'All') {
-      const monthCol = activeSheetData.columns.find(c => /bulan|month/i.test(c));
-      if (monthCol) {
-        result = result.filter(row => String(row[monthCol]).toLowerCase().includes(filterState.month.toLowerCase()));
-      } else {
-        result = result.filter(row => {
-          return Object.values(row).some(val => String(val).toLowerCase().includes(filterState.month.toLowerCase()));
-        });
+      
+      // Filter by month if selected (only if sheet contains months)
+      const hasMonths = activeSheetData.months && activeSheetData.months.length > 0;
+      if (hasMonths && filterState.month !== 'All' && mo !== filterState.month) {
+        return;
       }
-    }
-
+      
+      const dataPoint: any = {
+        period: periodKey,
+        year: yr,
+        month: mo
+      };
+      
+      // Append values for selected indicators using safe alphanumeric keys
+      filterState.yAxis.forEach((indicator) => {
+        const indIdx = activeSheetData.indicators.indexOf(indicator);
+        const safeKey = `ind_${indIdx}`;
+        dataPoint[safeKey] = activeSheetData.indicatorsData[indicator]?.[periodKey] ?? 0;
+      });
+      
+      result.push(dataPoint);
+    });
+    
     return result;
-  }, [activeSheetData, filterState.year, filterState.month]);
+  }, [activeSheetData, filterState.year, filterState.month, filterState.yAxis]);
 
-  // Unique ID for SVG extraction
-  const chartId = 'finsight-recharts-canvas';
+  // Determine if dual Y-axes are needed based on selected series scale differences
+  const { useDualAxis, smallKeys } = useMemo(() => {
+    if (!activeSheetData || filterState.yAxis.length === 0 || filteredData.length === 0) {
+      return { useDualAxis: false, smallKeys: new Set<string>() };
+    }
+
+    const smallKeys = new Set<string>();
+    const largeKeys = new Set<string>();
+
+    filterState.yAxis.forEach((indicator) => {
+      const indIdx = activeSheetData.indicators.indexOf(indicator);
+      const safeKey = `ind_${indIdx}`;
+      
+      // Check maximum value in filtered data
+      const vals = filteredData.map(d => Number(d[safeKey]) || 0);
+      const maxVal = Math.max(...vals, 0);
+
+      // If maxVal <= 200, it's considered small (like NPL % or LDR %)
+      if (maxVal <= 200) {
+        smallKeys.add(safeKey);
+      } else {
+        largeKeys.add(safeKey);
+      }
+    });
+
+    const useDualAxis = smallKeys.size > 0 && largeKeys.size > 0;
+    return { useDualAxis, smallKeys };
+  }, [activeSheetData, filterState.yAxis, filteredData]);
+
+  const chartId = 'dashboard-main-chart';
 
   // Export SVG file
   const handleExportSVG = () => {
@@ -87,13 +121,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     }
 
     const serializer = new XMLSerializer();
-    let svgString = serializer.serializeToString(svgEl);
-    
-    // Add namespace if missing
-    if (!svgString.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
-      svgString = svgString.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
-    }
-
+    const svgString = serializer.serializeToString(svgEl);
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     const blobUrl = URL.createObjectURL(blob);
     
@@ -120,7 +148,6 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     const rect = svgEl.getBoundingClientRect();
     
     const canvas = document.createElement('canvas');
-    // Save with 2x scale for high crispness
     canvas.width = rect.width * 2;
     canvas.height = rect.height * 2;
     const ctx = canvas.getContext('2d');
@@ -131,7 +158,6 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     const url = URL.createObjectURL(svgBlob);
     
     img.onload = () => {
-      // Draw white background
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -156,21 +182,20 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{label}</p>
           <div className="space-y-1">
             {payload.map((pld: any, index: number) => {
-              const cellCoord = pld.payload?._cellCoordinates?.[pld.name] || '';
-
+              const isPercentage = pld.name.toLowerCase().includes('npl') || pld.name.toLowerCase().includes('ldr') || pld.name.toLowerCase().includes('%') || pld.name.toLowerCase().includes('rasio') || pld.name.toLowerCase().includes('pertumbuhan');
+              const formattedVal = typeof pld.value === 'number' 
+                ? isPercentage 
+                  ? `${pld.value.toLocaleString('id-ID')}%`
+                  : pld.value.toLocaleString('id-ID')
+                : pld.value;
               return (
                 <div key={index} className="flex items-center gap-4 justify-between">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: pld.color || pld.fill }} />
-                    <span className="text-[11px] font-semibold text-slate-600 truncate max-w-[120px]">{pld.name}</span>
-                    {cellCoord && (
-                      <span className="text-[9px] font-black text-slate-400 bg-slate-50 border border-slate-100/80 px-1 py-0.5 rounded font-mono select-none" title={`Sel Excel: ${cellCoord}`}>
-                        {cellCoord}
-                      </span>
-                    )}
+                    <span className="text-[11px] font-semibold text-slate-600 truncate max-w-[150px]">{pld.name}</span>
                   </div>
                   <span className="text-[11px] font-extrabold text-slate-900 shrink-0 ml-2">
-                    {typeof pld.value === 'number' ? pld.value.toLocaleString('id-ID') : pld.value}
+                    {formattedVal}
                   </span>
                 </div>
               );
@@ -184,48 +209,56 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
 
   // Render Chart based on Selected Chart Type
   const renderChart = () => {
+    if (filterState.yAxis.length === 0) {
+      return (
+        <div className="h-full w-full flex flex-col items-center justify-center text-slate-400 py-16">
+          <FileWarning size={32} className="text-[#C61E1E] opacity-40 mb-2 animate-bounce" />
+          <p className="text-xs font-bold text-slate-700">Harap Pilih Indikator Keuangan</p>
+          <p className="text-[10px] text-slate-400 mt-1">Centang setidaknya satu indikator keuangan pada menu filter untuk memicu grafik visualisasi.</p>
+        </div>
+      );
+    }
+
     if (filteredData.length === 0) {
       return (
         <div className="h-full w-full flex flex-col items-center justify-center text-slate-400 py-16">
-          <p className="text-xs font-semibold">Tidak ada data untuk filter yang dipilih</p>
-          <p className="text-[10px] text-slate-400">Silakan sesuaikan filter bulan, tahun, atau rentang data Anda.</p>
+          <p className="text-xs font-semibold">Tidak ada data untuk filter periode yang dipilih</p>
+          <p className="text-[10px] text-slate-400">Silakan sesuaikan filter bulan, tahun, atau gunakan data sampel.</p>
         </div>
       );
     }
 
-    const { xAxis, yAxis, chartType } = filterState;
-
-    if (!xAxis || yAxis.length === 0) {
-      return (
-        <div className="h-full w-full flex flex-col items-center justify-center text-slate-400 py-16">
-          <p className="text-xs font-semibold">Harap tentukan sumbu X dan sumbu Y</p>
-          <p className="text-[10px] text-slate-400">Pilih kolom X (misal: Periode) dan setidaknya satu kolom Y (nilai numerik) pada area filter.</p>
-        </div>
-      );
-    }
-
-    // Standard Recharts layout variables
     const margin = { top: 20, right: 10, left: 10, bottom: 10 };
 
-    switch (chartType) {
+    switch (filterState.chartType) {
       case 'bar':
         return (
           <BarChart data={filteredData} margin={margin}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-            <XAxis dataKey={xAxis} tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="left" stroke="#64748B" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            {useDualAxis && (
+              <YAxis yAxisId="right" orientation="right" stroke="#C61E1E" tick={{ fontSize: 10, fill: '#C61E1E', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            )}
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
-            {yAxis.map((col, idx) => (
-              <Bar 
-                key={col} 
-                dataKey={col} 
-                fill={CHART_COLORS[idx % CHART_COLORS.length]} 
-                radius={[4, 4, 0, 0]}
-                maxBarSize={50}
-              />
-            ))}
-            {showZoom && <Brush dataKey={xAxis} height={20} stroke="#E2E8F0" tickFormatter={() => ''} />}
+            {filterState.yAxis.map((indicator) => {
+              const indIdx = activeSheetData.indicators.indexOf(indicator);
+              const safeKey = `ind_${indIdx}`;
+              const axisId = useDualAxis && smallKeys.has(safeKey) ? 'right' : 'left';
+              return (
+                <Bar 
+                  key={indicator} 
+                  name={indicator}
+                  dataKey={safeKey} 
+                  yAxisId={axisId}
+                  fill={CHART_COLORS[indIdx % CHART_COLORS.length]} 
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={50}
+                />
+              );
+            })}
+            {showZoom && <Brush dataKey="period" height={20} stroke="#E2E8F0" tickFormatter={() => ''} />}
           </BarChart>
         );
 
@@ -233,22 +266,33 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
         return (
           <LineChart data={filteredData} margin={margin}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-            <XAxis dataKey={xAxis} tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="left" stroke="#64748B" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            {useDualAxis && (
+              <YAxis yAxisId="right" orientation="right" stroke="#C61E1E" tick={{ fontSize: 10, fill: '#C61E1E', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            )}
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
-            {yAxis.map((col, idx) => (
-              <Line
-                key={col}
-                type="monotone"
-                dataKey={col}
-                stroke={CHART_COLORS[idx % CHART_COLORS.length]}
-                strokeWidth={2.5}
-                activeDot={{ r: 6, strokeWidth: 0 }}
-                dot={{ r: 3, strokeWidth: 1 }}
-              />
-            ))}
-            {showZoom && <Brush dataKey={xAxis} height={20} stroke="#E2E8F0" tickFormatter={() => ''} />}
+            {filterState.yAxis.map((indicator) => {
+              const indIdx = activeSheetData.indicators.indexOf(indicator);
+              const safeKey = `ind_${indIdx}`;
+              const axisId = useDualAxis && smallKeys.has(safeKey) ? 'right' : 'left';
+              return (
+                <Line
+                  key={indicator}
+                  name={indicator}
+                  type="monotone"
+                  dataKey={safeKey}
+                  yAxisId={axisId}
+                  stroke={CHART_COLORS[indIdx % CHART_COLORS.length]}
+                  strokeWidth={2.5}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
+                  dot={{ r: 3, strokeWidth: 1 }}
+                  connectNulls={true}
+                />
+              );
+            })}
+            {showZoom && <Brush dataKey="period" height={20} stroke="#E2E8F0" tickFormatter={() => ''} />}
           </LineChart>
         );
 
@@ -256,50 +300,62 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
         return (
           <AreaChart data={filteredData} margin={margin}>
             <defs>
-              {yAxis.map((col, idx) => (
-                <linearGradient key={col} id={`grad-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={CHART_COLORS[idx % CHART_COLORS.length]} stopOpacity={0.25}/>
-                  <stop offset="95%" stopColor={CHART_COLORS[idx % CHART_COLORS.length]} stopOpacity={0.01}/>
-                </linearGradient>
-              ))}
+              {filterState.yAxis.map((indicator) => {
+                const indIdx = activeSheetData.indicators.indexOf(indicator);
+                return (
+                  <linearGradient key={indicator} id={`grad-${indIdx}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_COLORS[indIdx % CHART_COLORS.length]} stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor={CHART_COLORS[indIdx % CHART_COLORS.length]} stopOpacity={0.01}/>
+                  </linearGradient>
+                );
+              })}
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-            <XAxis dataKey={xAxis} tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            <YAxis yAxisId="left" stroke="#64748B" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            {useDualAxis && (
+              <YAxis yAxisId="right" orientation="right" stroke="#C61E1E" tick={{ fontSize: 10, fill: '#C61E1E', fontWeight: 500 }} axisLine={false} tickLine={false} />
+            )}
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
-            {yAxis.map((col, idx) => (
-              <Area
-                key={col}
-                type="monotone"
-                dataKey={col}
-                stroke={CHART_COLORS[idx % CHART_COLORS.length]}
-                strokeWidth={2.5}
-                fillOpacity={1}
-                fill={`url(#grad-${idx})`}
-              />
-            ))}
-            {showZoom && <Brush dataKey={xAxis} height={20} stroke="#E2E8F0" tickFormatter={() => ''} />}
+            {filterState.yAxis.map((indicator) => {
+              const indIdx = activeSheetData.indicators.indexOf(indicator);
+              const safeKey = `ind_${indIdx}`;
+              const axisId = useDualAxis && smallKeys.has(safeKey) ? 'right' : 'left';
+              return (
+                <Area
+                  key={indicator}
+                  name={indicator}
+                  type="monotone"
+                  dataKey={safeKey}
+                  yAxisId={axisId}
+                  stroke={CHART_COLORS[indIdx % CHART_COLORS.length]}
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill={`url(#grad-${indIdx})`}
+                  connectNulls={true}
+                />
+              );
+            })}
+            {showZoom && <Brush dataKey="period" height={20} stroke="#E2E8F0" tickFormatter={() => ''} />}
           </AreaChart>
         );
 
       case 'pie':
-        // For Pie chart, we aggregate the first Y-Axis column values per X-Axis category
-        const pieData = (() => {
-          const firstY = yAxis[0];
-          const grouped: { [key: string]: number } = {};
-          
-          filteredData.forEach(row => {
-            const key = String(row[xAxis] || 'Lainnya');
-            const val = Number(row[firstY] || 0);
-            grouped[key] = (grouped[key] || 0) + val;
+        // Sum values across filtered periods for each indicator
+        const pieData = filterState.yAxis.map((indicator) => {
+          const indIdx = activeSheetData.indicators.indexOf(indicator);
+          const safeKey = `ind_${indIdx}`;
+          let sum = 0;
+          filteredData.forEach(pt => {
+            sum += pt[safeKey] || 0;
           });
-
-          return Object.keys(grouped).map(key => ({
-            name: key,
-            value: parseFloat(grouped[key].toFixed(2))
-          })).slice(0, 10); // Limit to top 10 slices for clean formatting
-        })();
+          return {
+            name: indicator,
+            value: parseFloat(sum.toFixed(2)),
+            colorIndex: indIdx
+          };
+        }).filter(item => item.value > 0);
 
         return (
           <PieChart>
@@ -313,7 +369,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
               dataKey="value"
             >
               {pieData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={CHART_COLORS[entry.colorIndex % CHART_COLORS.length]} />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
@@ -322,28 +378,27 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
         );
 
       case 'horizontal_bar':
-        // Display ranked largest values first
-        const firstY = yAxis[0];
-        const sortedData = [...filteredData]
-          .sort((a, b) => Number(b[firstY] || 0) - Number(a[firstY] || 0))
-          .slice(0, 12); // top 12 items
-
         return (
-          <BarChart data={sortedData} layout="vertical" margin={{ top: 20, right: 30, left: 40, bottom: 10 }}>
+          <BarChart data={filteredData} layout="vertical" margin={{ top: 20, right: 30, left: 40, bottom: 10 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
             <XAxis type="number" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
-            <YAxis dataKey={xAxis} type="category" tick={{ fontSize: 9, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} width={80} />
+            <YAxis dataKey="period" type="category" tick={{ fontSize: 9, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} width={80} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.01)' }} />
             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
-            {yAxis.map((col, idx) => (
-              <Bar 
-                key={col} 
-                dataKey={col} 
-                fill={CHART_COLORS[idx % CHART_COLORS.length]} 
-                radius={[0, 4, 4, 0]}
-                maxBarSize={30}
-              />
-            ))}
+            {filterState.yAxis.map((indicator) => {
+              const indIdx = activeSheetData.indicators.indexOf(indicator);
+              const safeKey = `ind_${indIdx}`;
+              return (
+                <Bar 
+                  key={indicator} 
+                  name={indicator}
+                  dataKey={safeKey} 
+                  fill={CHART_COLORS[indIdx % CHART_COLORS.length]} 
+                  radius={[0, 4, 4, 0]}
+                  maxBarSize={30}
+                />
+              );
+            })}
           </BarChart>
         );
 
@@ -358,17 +413,17 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
       <div className="flex items-center justify-between border-b border-slate-50 pb-4">
         <div>
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-            Visualisasi Data ({filterState.chartType.replace('_', ' ')})
+            Visualisasi Tren ({filterState.chartType.replace('_', ' ')})
           </h3>
           <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-            Menampilkan {filteredData.length} entri sheet '{filterState.sheet}'
+            Menampilkan data sheet '{filterState.sheet}'
           </p>
         </div>
 
         {/* Toolbar Controls */}
         <div className="flex items-center gap-2">
           {/* Zoom toggle brush slider */}
-          {['bar', 'line', 'area'].includes(filterState.chartType) && (
+          {['bar', 'line', 'area'].includes(filterState.chartType) && filterState.yAxis.length > 0 && (
             <button
               onClick={() => setShowZoom(!showZoom)}
               className={`p-2 rounded-lg border transition-colors flex items-center gap-1.5 text-xs font-semibold ${

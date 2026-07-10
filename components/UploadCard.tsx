@@ -1,7 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, CheckCircle, FileText, BarChart3, ListCollapse, Database, Calendar } from 'lucide-react';
-import { formatBytes } from '../services/excelService';
+import { 
+  UploadCloud, 
+  CheckCircle, 
+  FileText, 
+  BarChart3, 
+  ListCollapse, 
+  Database, 
+  Calendar, 
+  X, 
+  FileWarning, 
+  Download 
+} from 'lucide-react';
+import { formatBytes, downloadOjkTemplate } from '../services/excelService';
 import { ActiveFile } from '../types/dashboard';
 
 interface UploadCardProps {
@@ -9,9 +20,18 @@ interface UploadCardProps {
   activeFile: ActiveFile | null;
   loading: boolean;
   progress: number;
+  error?: string | null;
+  onErrorClose?: () => void;
 }
 
-export default function UploadCard({ onUpload, activeFile, loading, progress }: UploadCardProps) {
+export default function UploadCard({ 
+  onUpload, 
+  activeFile, 
+  loading, 
+  progress, 
+  error, 
+  onErrorClose 
+}: UploadCardProps) {
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,16 +77,82 @@ export default function UploadCard({ onUpload, activeFile, loading, progress }: 
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6">
+      {/* 1. Validation Error Display */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-red-50 border border-red-200 rounded-2xl p-6 relative overflow-hidden"
+          >
+            <button 
+              onClick={onErrorClose}
+              className="absolute right-4 top-4 p-1 hover:bg-red-100 text-red-600 rounded-full transition-colors"
+            >
+              <X size={16} />
+            </button>
+            
+            <div className="flex gap-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-[#C61E1E] flex items-center justify-center shrink-0">
+                <FileWarning size={20} />
+              </div>
+              
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-red-900">
+                    ❌ Format Excel tidak sesuai.
+                  </h3>
+                  <p className="text-xs text-red-700 font-medium">
+                    Silakan gunakan Template Excel OJK yang direkomendasikan sistem.
+                  </p>
+                </div>
+                
+                {/* Specific Validation Failure Reason */}
+                <div className="bg-white/80 border border-red-100 p-3 rounded-xl">
+                  <span className="text-[9px] uppercase font-bold text-red-500 tracking-wider">Detail Kesalahan:</span>
+                  <p className="text-xs font-semibold text-slate-700 mt-1 leading-relaxed">
+                    {error}
+                  </p>
+                </div>
+
+                {/* Download Template Button */}
+                <button
+                  onClick={downloadOjkTemplate}
+                  className="flex items-center gap-2 bg-[#C61E1E] text-white font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-[#A31818] transition-colors shadow-sm"
+                >
+                  <Download size={14} />
+                  <span>Download Template Excel OJK</span>
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Main Upload Card */}
       <motion.div 
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         className="bg-white rounded-2xl border border-slate-100 shadow-soft p-8"
       >
-        <h2 className="text-lg font-bold text-slate-800 mb-2">Unggah File Keuangan</h2>
-        <p className="text-sm text-slate-500 mb-6">
-          Unggah dokumen laporan keuangan berformat Microsoft Excel (.xls, .xlsx) untuk divisualisasikan secara instan.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">Unggah Laporan Keuangan OJK</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Unggah berkas Excel yang mengikuti Template Resmi OJK Jawa Barat.
+            </p>
+          </div>
+          
+          <button
+            onClick={downloadOjkTemplate}
+            className="flex items-center gap-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs px-3.5 py-2 rounded-xl transition-all"
+          >
+            <Download size={13} />
+            <span>Download Template</span>
+          </button>
+        </div>
 
         {/* Drag & Drop Container */}
         <div
@@ -112,7 +198,7 @@ export default function UploadCard({ onUpload, activeFile, loading, progress }: 
               className="mt-6 space-y-2 overflow-hidden"
             >
               <div className="flex justify-between text-xs font-semibold text-slate-600">
-                <span>Memproses file keuangan...</span>
+                <span>Memvalidasi format & memproses data keuangan...</span>
                 <span>{progress}%</span>
               </div>
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -128,9 +214,9 @@ export default function UploadCard({ onUpload, activeFile, loading, progress }: 
         </AnimatePresence>
       </motion.div>
 
-      {/* Success Metadata Display */}
+      {/* 3. Success Metadata Display */}
       <AnimatePresence>
-        {activeFile && !loading && (
+        {activeFile && !loading && !activeFile.validationError && (
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
@@ -143,13 +229,13 @@ export default function UploadCard({ onUpload, activeFile, loading, progress }: 
                 <CheckCircle size={24} />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-800">File Berhasil Diproses</h3>
-                <p className="text-xs text-slate-500">Seluruh data telah divalidasi dan siap divisualisasikan</p>
+                <h3 className="text-sm font-bold text-slate-800">✔ File Berhasil Diproses</h3>
+                <p className="text-xs text-slate-500">Seluruh struktur data telah terverifikasi sesuai template resmi OJK</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* File details card */}
+              {/* File name */}
               <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl">
                 <div className="p-2.5 bg-white text-slate-500 rounded-lg shadow-sm border border-slate-100/50">
                   <FileText size={18} />
@@ -162,6 +248,7 @@ export default function UploadCard({ onUpload, activeFile, loading, progress }: 
                 </div>
               </div>
 
+              {/* Sheet count */}
               <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl">
                 <div className="p-2.5 bg-white text-slate-500 rounded-lg shadow-sm border border-slate-100/50">
                   <ListCollapse size={18} />
@@ -172,16 +259,40 @@ export default function UploadCard({ onUpload, activeFile, loading, progress }: 
                 </div>
               </div>
 
+              {/* Indicator count */}
+              <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl">
+                <div className="p-2.5 bg-white text-slate-500 rounded-lg shadow-sm border border-slate-100/50">
+                  <BarChart3 size={18} />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Jumlah Indikator</span>
+                  <p className="text-xs font-bold text-slate-800">{activeFile.totalIndicators || 5} Indikator</p>
+                </div>
+              </div>
+
+              {/* Period count */}
+              <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl">
+                <div className="p-2.5 bg-white text-slate-500 rounded-lg shadow-sm border border-slate-100/50">
+                  <Calendar size={18} />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Jumlah Periode</span>
+                  <p className="text-xs font-bold text-slate-800">{activeFile.totalPeriods || 12} Bulan</p>
+                </div>
+              </div>
+
+              {/* Data points count */}
               <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl">
                 <div className="p-2.5 bg-white text-slate-500 rounded-lg shadow-sm border border-slate-100/50">
                   <Database size={18} />
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Jumlah Baris</span>
-                  <p className="text-xs font-bold text-slate-800">{activeFile.rowCount} Baris Data</p>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Jumlah Data</span>
+                  <p className="text-xs font-bold text-slate-800">{(activeFile.rowCount || 0).toLocaleString('id-ID')} Data</p>
                 </div>
               </div>
 
+              {/* File Size */}
               <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl">
                 <div className="p-2.5 bg-white text-slate-500 rounded-lg shadow-sm border border-slate-100/50">
                   <BarChart3 size={18} />
@@ -189,16 +300,6 @@ export default function UploadCard({ onUpload, activeFile, loading, progress }: 
                 <div>
                   <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Ukuran File</span>
                   <p className="text-xs font-bold text-slate-800">{formatBytes(activeFile.size)}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl">
-                <div className="p-2.5 bg-white text-slate-500 rounded-lg shadow-sm border border-slate-100/50">
-                  <Calendar size={18} />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Tanggal Upload</span>
-                  <p className="text-xs font-bold text-slate-800">{activeFile.uploadDate}</p>
                 </div>
               </div>
             </div>

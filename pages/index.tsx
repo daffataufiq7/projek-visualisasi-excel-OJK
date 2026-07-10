@@ -15,6 +15,9 @@ import UploadHistory from '../components/UploadHistory';
 import Settings from '../components/Settings';
 import About from '../components/About';
 import Reports from '../components/Reports';
+import TemplateDownload from '../components/TemplateDownload';
+import YoyAnalysis from '../components/YoyAnalysis';
+import YoyDashboardWidget from '../components/YoyDashboardWidget';
 
 import { useDashboardState } from '../hooks/useDashboardState';
 
@@ -26,6 +29,8 @@ export default function Home() {
     sidebarCollapsed,
     loading,
     uploadProgress,
+    uploadError,
+    setUploadError,
     filterState,
     setActiveTab,
     setSidebarCollapsed,
@@ -106,6 +111,14 @@ export default function Home() {
               />
             </div>
 
+            {/* YoY Nominal Growth Chart widget */}
+            <div className="w-full">
+              <YoyDashboardWidget
+                activeFile={activeFile}
+                filterState={filterState}
+              />
+            </div>
+
             {/* Annual YoY comparison sparklines cards */}
             <YearComparison
               activeFile={activeFile}
@@ -127,6 +140,20 @@ export default function Home() {
           </motion.div>
         );
 
+      case 'yoy':
+        if (!activeFile) {
+          return (
+            <div className="text-center py-20 text-slate-400">
+              <p className="text-xs font-semibold">Harap unggah file Excel terlebih dahulu</p>
+            </div>
+          );
+        }
+        return (
+          <motion.div {...pageTransition}>
+            <YoyAnalysis activeFile={activeFile} />
+          </motion.div>
+        );
+
       case 'upload':
         return (
           <motion.div {...pageTransition}>
@@ -135,7 +162,16 @@ export default function Home() {
               activeFile={activeFile}
               loading={loading}
               progress={uploadProgress}
+              error={uploadError}
+              onErrorClose={() => setUploadError(null)}
             />
+          </motion.div>
+        );
+
+      case 'template':
+        return (
+          <motion.div {...pageTransition}>
+            <TemplateDownload />
           </motion.div>
         );
 

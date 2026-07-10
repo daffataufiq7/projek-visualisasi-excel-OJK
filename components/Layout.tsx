@@ -13,7 +13,8 @@ import {
   CheckCircle,
   FileCheck,
   User,
-  ChevronDown
+  ChevronDown,
+  TrendingUp
 } from 'lucide-react';
 import Logo from './Logo';
 import { ActiveFile } from '../types/dashboard';
@@ -39,10 +40,12 @@ export default function Layout({
 
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
+    { id: 'yoy', name: 'Analisis YoY', icon: TrendingUp },
     { id: 'upload', name: 'Upload Excel', icon: UploadCloud },
+    { id: 'template', name: 'Download Template', icon: FileSpreadsheet },
     { id: 'history', name: 'Riwayat Upload', icon: History },
     { id: 'visualisasi', name: 'Visualisasi', icon: LineChart },
-    { id: 'laporan', name: 'Laporan', icon: FileSpreadsheet },
+    { id: 'laporan', name: 'Laporan', icon: FileCheck },
     { id: 'pengaturan', name: 'Pengaturan', icon: Settings },
     { id: 'tentang', name: 'Tentang', icon: Info },
   ];

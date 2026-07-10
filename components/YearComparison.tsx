@@ -26,47 +26,36 @@ export default function YearComparison({ activeFile, filterState }: YearComparis
     const years = activeSheetData.years.filter(y => y && y !== 'All').sort();
     if (years.length === 0) return [];
 
-    // Find target column for comparison (use first selected Y-Axis, or first numeric column)
-    const targetCol = filterState.yAxis[0] || activeSheetData.numericColumns[0];
+    // Find target indicator (use first selected, or first in sheet)
+    const targetCol = filterState.yAxis[0] || activeSheetData.indicators[0];
     if (!targetCol) return [];
-
-    // Identify year and month columns
-    const yearCol = activeSheetData.columns.find(c => /tahun|year/i.test(c));
-    const monthCol = activeSheetData.columns.find(c => /bulan|month/i.test(c)) || activeSheetData.columns[0];
 
     const stats: YearStats[] = [];
 
     years.forEach((yr, idx) => {
-      // Filter rows for this year
-      let rowsForYear = activeSheetData.data;
-      if (yearCol) {
-        rowsForYear = rowsForYear.filter(r => String(r[yearCol]) === yr);
-      } else {
-        rowsForYear = rowsForYear.filter(r => Object.values(r).some(val => String(val).includes(yr)));
-      }
+      // Find periods for this year
+      const periodsForYear = activeSheetData.periods.filter(p => p.startsWith(yr));
 
-      // Sum and average
       let sum = 0;
       let validCount = 0;
       const monthlyValues: { month: string; value: number }[] = [];
 
-      rowsForYear.forEach((row) => {
-        const val = Number(row[targetCol]);
-        if (!isNaN(val) && val !== null) {
-          sum += val;
-          validCount++;
-          
-          const mName = monthCol ? String(row[monthCol] || '') : '';
-          monthlyValues.push({
-            month: mName,
-            value: val
-          });
-        }
+      periodsForYear.forEach((period) => {
+        const val = activeSheetData.indicatorsData[targetCol]?.[period] ?? 0;
+        const mName = period.split('-')[1];
+        
+        sum += val;
+        validCount++;
+        
+        monthlyValues.push({
+          month: mName,
+          value: val
+        });
       });
 
       const avg = validCount > 0 ? sum / validCount : 0;
 
-      // Calculate YoY changes compared to previous year in the sorted list
+      // YoY changes
       let growthPct: number | null = null;
       let changeVal: number | null = null;
 
@@ -84,7 +73,7 @@ export default function YearComparison({ activeFile, filterState }: YearComparis
         avgValue: parseFloat(avg.toFixed(2)),
         growthPct: growthPct !== null ? parseFloat(growthPct.toFixed(1)) : null,
         changeVal: changeVal !== null ? parseFloat(changeVal.toFixed(2)) : null,
-        monthlyData: monthlyValues.slice(0, 12), // Keep up to 12 monthly points
+        monthlyData: monthlyValues.slice(0, 12),
       });
     });
 
@@ -101,7 +90,7 @@ export default function YearComparison({ activeFile, filterState }: YearComparis
     numYears >= 4 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1';
 
   // Target label for visual description
-  const targetColLabel = filterState.yAxis[0] || activeSheetData.numericColumns[0];
+  const targetColLabel = filterState.yAxis[0] || activeSheetData.indicators[0];
 
   return (
     <div className="w-full space-y-4">
