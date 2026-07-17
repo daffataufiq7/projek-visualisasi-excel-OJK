@@ -17,7 +17,7 @@ export default function FilterArea({
   onSheetChange
 }: FilterAreaProps) {
   const activeSheetData = activeFile.sheets[filterState.sheet] || activeFile.sheets[activeFile.activeSheetName];
-  
+
   const indicators = activeSheetData?.indicators || [];
   const years = ['All', ...(activeSheetData?.years || [])];
   const months = ['All', ...(activeSheetData?.months || [])];
@@ -42,7 +42,7 @@ export default function FilterArea({
         </h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
         {/* 1. Pilih Sheet */}
         <div className="flex flex-col space-y-1.5">
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">1. Sektor / Kategori Sheet</label>
@@ -117,12 +117,28 @@ export default function FilterArea({
             <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
         </div>
+
+        {/* 5. Overlay Rasio */}
+        <div className="flex flex-col space-y-1.5">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">5. Overlay Rasio</label>
+          <div className="flex items-center h-full">
+            <label className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200/80 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors w-full select-none">
+              <input
+                type="checkbox"
+                checked={filterState.overlayRatio || false}
+                onChange={(e) => onFilterChange({ overlayRatio: e.target.checked })}
+                className="rounded border-slate-300 text-[#C61E1E] focus:ring-[#C61E1E] w-4 h-4 cursor-pointer"
+              />
+              <span className="text-[11px] font-bold text-slate-600">Aktifkan Overlay Rasio (%)</span>
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* Multi-Select Indicators Section */}
       <div className="flex flex-col space-y-2 border-t border-slate-50 pt-4">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          5. Pilih Indikator Keuangan (Multi-select)
+          6. Pilih Indikator Keuangan (Multi-select)
         </span>
         <div className="flex flex-wrap gap-2.5">
           {indicators.map((ind) => {
@@ -132,11 +148,10 @@ export default function FilterArea({
                 key={ind}
                 type="button"
                 onClick={() => handleIndicatorToggle(ind)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${
-                  isChecked
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${isChecked
                     ? 'bg-[#C61E1E] text-white border-[#C61E1E] shadow-sm shadow-red-900/10'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-                }`}
+                  }`}
               >
                 {isChecked && <Check size={12} strokeWidth={3} />}
                 <span>{ind}</span>

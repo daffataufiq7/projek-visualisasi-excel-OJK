@@ -27,6 +27,66 @@ export default function DataTable({ sheetData }: DataTableProps) {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
   const [colDropdownOpen, setColDropdownOpen] = useState(false);
 
+  // Check if a row represents a percentage indicator and if it's decimal-scaled
+  const rowFormatSpecs = useMemo(() => {
+    if (!sheetData) return {};
+    
+    const specs: { [indicator: string]: { isPercent: boolean; isDecimalScaled: boolean } } = {};
+    
+    sheetData.data.forEach((row) => {
+      const indicator = row.indicator;
+      if (!indicator) return;
+      
+      const indicatorName = String(indicator).toLowerCase();
+      const isPercent = 
+        indicatorName.includes('npl') || 
+        indicatorName.includes('ldr') || 
+        indicatorName.includes('car') || 
+        indicatorName.includes('roa') || 
+        indicatorName.includes('roe') || 
+        indicatorName.includes('nim') || 
+        indicatorName.includes('bopo') || 
+        indicatorName.includes('%') || 
+        indicatorName.includes('rasio') || 
+        indicatorName.includes('ratio') || 
+        indicatorName.includes('pertumbuhan') || 
+        indicatorName.includes('growth') || 
+        indicatorName.includes('rate');
+        
+      if (isPercent) {
+        // Find all numeric values in this row (for period columns)
+        let maxAbsVal = 0;
+        let hasNumbers = false;
+        
+        sheetData.numericColumns.forEach((col) => {
+          const val = row[col];
+          if (typeof val === 'number') {
+            hasNumbers = true;
+            if (Math.abs(val) > maxAbsVal) {
+              maxAbsVal = Math.abs(val);
+            }
+          }
+        });
+        
+        // Determine decimal scaling based on typical indicator range
+        const isLargeRatio = 
+          indicatorName.includes('ldr') || 
+          indicatorName.includes('bopo') || 
+          indicatorName.includes('car') || 
+          indicatorName.includes('roe') || 
+          indicatorName.includes('nim') || 
+          indicatorName.includes('capital');
+          
+        const isDecimalScaled = hasNumbers && (isLargeRatio ? maxAbsVal <= 2.0 : maxAbsVal <= 0.15);
+        specs[indicator] = { isPercent: true, isDecimalScaled };
+      } else {
+        specs[indicator] = { isPercent: false, isDecimalScaled: false };
+      }
+    });
+    
+    return specs;
+  }, [sheetData]);
+
   // Initialize columns visibility when sheetData changes
   React.useEffect(() => {
     if (sheetData) {
@@ -320,7 +380,15 @@ export default function DataTable({ sheetData }: DataTableProps) {
                               {val === null || val === undefined 
                                 ? '-' 
                                 : isNumeric && typeof val === 'number' 
-                                  ? val.toLocaleString('id-ID') 
+                                  ? (() => {
+                                      const spec = rowFormatSpecs[row.indicator];
+                                      if (spec?.isPercent) {
+                                        return spec.isDecimalScaled 
+                                          ? `${(val * 100).toLocaleString('id-ID')}%` 
+                                          : `${val.toLocaleString('id-ID')}%`;
+                                      }
+                                      return val.toLocaleString('id-ID');
+                                    })()
                                   : String(val)
                               }
                             </span>

@@ -18,25 +18,27 @@ export function useDashboardState() {
     month: 'All',
     xAxis: 'period',
     yAxis: [],
-    chartType: 'line',
+    chartType: 'bar',
+    overlayRatio: false,
   });
 
   // Load initial mock file & history on mount
   useEffect(() => {
     const mockFile = generateMockFile();
     setActiveFile(mockFile);
-    
+
     // Set default filter state based on mock file
     const firstSheetName = mockFile.sheetNames[0];
     const sheetData = mockFile.sheets[firstSheetName];
-    
+
     setFilterState({
       sheet: firstSheetName,
       year: 'All',
       month: 'All',
       xAxis: 'period',
       yAxis: sheetData.indicators,
-      chartType: 'line',
+      chartType: 'bar',
+      overlayRatio: false,
     });
 
     // Populate history with the default mock file
@@ -71,7 +73,7 @@ export function useDashboardState() {
     setLoading(true);
     setUploadProgress(10);
     setUploadError(null);
-    
+
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 90) {
@@ -84,13 +86,13 @@ export function useDashboardState() {
 
     try {
       const parsedFile = await parseExcelFile(file);
-      
+
       clearInterval(progressInterval);
       setUploadProgress(100);
-      
+
       setTimeout(() => {
         setActiveFile(parsedFile);
-        
+
         // Reset filters for new file
         const firstSheet = parsedFile.sheetNames[0];
         const sheetData = parsedFile.sheets[firstSheet];
@@ -101,7 +103,8 @@ export function useDashboardState() {
           month: 'All',
           xAxis: 'period',
           yAxis: sheetData.indicators,
-          chartType: 'line',
+          chartType: 'bar',
+          overlayRatio: false,
         });
 
         // Add to history
@@ -125,7 +128,7 @@ export function useDashboardState() {
         const updatedHistory = [newItem, ...history.filter(h => h.name !== file.name)];
         setHistory(updatedHistory);
         localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
-        
+
         setLoading(false);
         setActiveTab('dashboard'); // Redirect to dashboard to show upload results
       }, 500);
@@ -135,7 +138,7 @@ export function useDashboardState() {
       setLoading(false);
       const errMsg = error instanceof Error ? error.message : 'Format template tidak sesuai';
       setUploadError(errMsg);
-      
+
       // Save failed upload attempt in history for visibility
       const failedItem: UploadHistoryItem = {
         id: `${Date.now()}-${file.name}`,
@@ -195,7 +198,8 @@ export function useDashboardState() {
         month: 'All',
         xAxis: 'period',
         yAxis: mock.sheets[sheet].indicators,
-        chartType: 'line',
+        chartType: 'bar',
+        overlayRatio: false,
       });
     }
   };
@@ -213,7 +217,8 @@ export function useDashboardState() {
         month: 'All',
         xAxis: 'period',
         yAxis: file.sheets[sheet].indicators,
-        chartType: 'line',
+        chartType: 'bar',
+        overlayRatio: false,
       });
       setActiveTab('dashboard');
     } else if (item && item.status === 'failed') {

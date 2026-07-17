@@ -45,6 +45,7 @@ export interface FilterState {
   xAxis: string; // Will always be 'period'
   yAxis: string[]; // Will hold selected indicators: ['Aset', 'Kredit']
   chartType: 'bar' | 'line' | 'area' | 'pie' | 'horizontal_bar';
+  overlayRatio?: boolean;
 }
 
 export interface UploadHistoryItem {
