@@ -1,49 +1,68 @@
-import { useState, useEffect } from 'react';
-import { ActiveFile, FilterState, UploadHistoryItem, SheetData } from '../types/dashboard';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { ActiveFile, FilterState, UploadHistoryItem } from '../types/dashboard';
 import { parseExcelFile, generateMockFile } from '../services/excelService';
 
 const LOCAL_STORAGE_HISTORY_KEY = 'finsight_upload_history';
 
 export function useDashboardState() {
-  const [activeFile, setActiveFile] = useState<ActiveFile | null>(null);
+  const [activeFileIds, setActiveFileIds] = useState<{ [category: string]: string }>({
+    bank_umum: 'default-mock-bank',
+    kredit_jenis: 'default-mock-kredit',
+    dpk_portofolio: 'default-mock-dpk',
+  });
   const [history, setHistory] = useState<UploadHistoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [filterState, setFilterState] = useState<FilterState>({
-    sheet: '',
-    year: 'All',
-    month: 'All',
-    xAxis: 'period',
-    yAxis: [],
-    chartType: 'bar',
-    overlayRatio: false,
+
+  const [filterStates, setFilterStates] = useState<{ [category: string]: FilterState }>({
+    bank_umum: {
+      sheet: '', year: 'All', month: 'All', xAxis: 'period', yAxis: [], chartType: 'bar',
+      selectedYears: [], selectedMonths: []
+    },
+    kredit_jenis: {
+      sheet: '', year: 'All', month: 'All', xAxis: 'period', yAxis: [], chartType: 'bar',
+      selectedYears: [], selectedMonths: []
+    },
+    dpk_portofolio: {
+      sheet: '', year: 'All', month: 'All', xAxis: 'period', yAxis: [], chartType: 'bar',
+      selectedYears: [], selectedMonths: []
+    },
   });
 
-  // Load initial mock file & history on mount
-  useEffect(() => {
-    const mockFile = generateMockFile();
-    setActiveFile(mockFile);
+  const getActiveCategory = (tab: string) => {
+    if (tab.startsWith('kredit_jenis')) return 'kredit_jenis';
+    if (tab.startsWith('dpk_portofolio')) return 'dpk_portofolio';
+    return 'bank_umum';
+  };
 
-    // Set default filter state based on mock file
-    const firstSheetName = mockFile.sheetNames[0];
-    const sheetData = mockFile.sheets[firstSheetName];
+  const activeCategory = getActiveCategory(activeTab);
+  const filterState = filterStates[activeCategory];
 
-    setFilterState({
-      sheet: firstSheetName,
-      year: 'All',
-      month: 'All',
-      xAxis: 'period',
-      yAxis: sheetData.indicators,
-      chartType: 'bar',
-      overlayRatio: false,
+  const setFilterState = (update: Partial<FilterState> | ((prev: FilterState) => FilterState)) => {
+    setFilterStates(prev => {
+      const current = prev[activeCategory];
+      const next = typeof update === 'function' ? update(current) : { ...current, ...update };
+      return {
+        ...prev,
+        [activeCategory]: next
+      };
     });
+  };
 
-    // Populate history with the default mock file
-    const initialHistoryItem: UploadHistoryItem = {
-      id: 'default-mock',
+  const activeFile = useMemo(() => {
+    const activeId = activeFileIds[activeCategory];
+    const item = history.find(h => h.id === activeId);
+    return item?.fileData || null;
+  }, [activeCategory, activeFileIds, history]);
+
+  // Unified mock item definitions
+  const defaultMockItems = useMemo(() => {
+    const mockFile = generateMockFile();
+    const initialHistoryBankUmum: UploadHistoryItem = {
+      id: 'default-mock-bank',
       name: mockFile.name,
       size: mockFile.size,
       sheetCount: mockFile.sheetNames.length,
@@ -51,25 +70,157 @@ export function useDashboardState() {
       uploadDate: mockFile.uploadDate,
       status: 'success',
       fileData: mockFile,
+      category: 'bank_umum',
+      isSample: true,
     };
 
+    const mockKreditFile = { ...mockFile, name: 'Data Sampel Kredit.xlsx', isSample: true };
+    const initialHistoryKredit: UploadHistoryItem = {
+      id: 'default-mock-kredit',
+      name: mockKreditFile.name,
+      size: mockKreditFile.size,
+      sheetCount: mockKreditFile.sheetNames.length,
+      rowCount: mockKreditFile.rowCount,
+      uploadDate: mockKreditFile.uploadDate,
+      status: 'success',
+      fileData: mockKreditFile,
+      category: 'kredit_jenis',
+      isSample: true,
+    };
+
+    const mockDpkFile = { ...mockFile, name: 'Data Sampel DPK.xlsx', isSample: true };
+    const initialHistoryDpk: UploadHistoryItem = {
+      id: 'default-mock-dpk',
+      name: mockDpkFile.name,
+      size: mockDpkFile.size,
+      sheetCount: mockDpkFile.sheetNames.length,
+      rowCount: mockDpkFile.rowCount,
+      uploadDate: mockDpkFile.uploadDate,
+      status: 'success',
+      fileData: mockDpkFile,
+      category: 'dpk_portofolio',
+      isSample: true,
+    };
+
+    return [initialHistoryBankUmum, initialHistoryKredit, initialHistoryDpk];
+  }, []);
+
+  // Sync with Server API (/api/data) to align Localhost & Ngrok users in real-time
+  const fetchServerState = useCallback(async () => {
+    try {
+      const res = await fetch('/api/data');
+      if (res.ok) {
+        const data = await res.json();
+        const serverHistory = data.history || [];
+        const serverActiveFileIds = data.activeFileIds || {};
+
+        const cleanedServerHistory = serverHistory.filter(
+          (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
+        );
+
+        const combinedHistory = [...defaultMockItems, ...cleanedServerHistory];
+
+        setHistory(combinedHistory);
+        if (serverActiveFileIds && Object.keys(serverActiveFileIds).length > 0) {
+          setActiveFileIds(prev => ({
+            ...prev,
+            ...serverActiveFileIds
+          }));
+        }
+
+        localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(combinedHistory));
+      }
+    } catch (err) {
+      console.warn('API sync failed, falling back to localStorage:', err);
+    }
+  }, [defaultMockItems]);
+
+  // Load initial data & start auto-sync polling
+  useEffect(() => {
+    const mockFile = generateMockFile();
+    const sheetBank = mockFile.sheetNames[0] || '';
+
+    setFilterStates({
+      bank_umum: {
+        sheet: sheetBank, year: 'All', month: 'All', xAxis: 'period',
+        yAxis: mockFile.sheets[sheetBank]?.indicators || [], chartType: 'bar',
+        selectedYears: [], selectedMonths: []
+      },
+      kredit_jenis: {
+        sheet: 'Kredit per Jenis Penggunaan', year: 'All', month: 'All', xAxis: 'period',
+        yAxis: [], chartType: 'bar',
+        selectedYears: [], selectedMonths: []
+      },
+      dpk_portofolio: {
+        sheet: 'DPK per Portofolio', year: 'All', month: 'All', xAxis: 'period',
+        yAxis: [], chartType: 'bar',
+        selectedYears: [], selectedMonths: []
+      },
+    });
+
+    // Try reading localStorage first for immediate render
     const storedHistory = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
     if (storedHistory) {
       try {
         const parsedHistory = JSON.parse(storedHistory) as UploadHistoryItem[];
-        const cleanedHistory = parsedHistory.filter(h => h.id !== 'default-mock');
-        setHistory([initialHistoryItem, ...cleanedHistory]);
+        const cleanedHistory = parsedHistory.filter(
+          h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
+        );
+        setHistory([...defaultMockItems, ...cleanedHistory]);
       } catch (e) {
-        setHistory([initialHistoryItem]);
+        setHistory(defaultMockItems);
       }
     } else {
-      setHistory([initialHistoryItem]);
-      localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify([initialHistoryItem]));
+      setHistory(defaultMockItems);
     }
-  }, []);
+
+    // Sync with Server API immediately
+    fetchServerState();
+
+    // Set up auto-sync polling every 3 seconds for seamless Ngrok <-> Localhost sync
+    const syncInterval = setInterval(() => {
+      fetchServerState();
+    }, 3000);
+
+    return () => clearInterval(syncInterval);
+  }, [defaultMockItems, fetchServerState]);
+
+  // Auto-populate filterState.yAxis (select all indicators) whenever the active file changes
+  // This handles: server sync switching activeFileIds, loadHistoryItem, and initial load
+  useEffect(() => {
+    const categories = ['bank_umum', 'kredit_jenis', 'dpk_portofolio'] as const;
+    setFilterStates(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const cat of categories) {
+        const activeId = activeFileIds[cat];
+        const item = history.find(h => h.id === activeId);
+        if (!item?.fileData) continue;
+        const file = item.fileData;
+        const currentFilter = prev[cat];
+        // Determine the correct sheet (use stored sheet if valid, else first sheet)
+        const sheet = file.sheetNames.includes(currentFilter.sheet)
+          ? currentFilter.sheet
+          : (file.sheetNames[0] || '');
+        const sheetData = file.sheets[sheet];
+        if (!sheetData) continue;
+        const allIndicators = sheetData.indicators || [];
+        // Only update if yAxis is empty OR the file has changed (indicators differ)
+        if (currentFilter.yAxis.length === 0 || currentFilter.sheet !== sheet) {
+          next[cat] = {
+            ...currentFilter,
+            sheet,
+            yAxis: allIndicators,
+          };
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [activeFileIds, history]);
 
   // Handle Excel Upload
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, redirectTab: string = 'bank_umum') => {
     setLoading(true);
     setUploadProgress(10);
     setUploadError(null);
@@ -90,26 +241,10 @@ export function useDashboardState() {
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      setTimeout(() => {
-        setActiveFile(parsedFile);
-
-        // Reset filters for new file
-        const firstSheet = parsedFile.sheetNames[0];
-        const sheetData = parsedFile.sheets[firstSheet];
-
-        setFilterState({
-          sheet: firstSheet,
-          year: 'All',
-          month: 'All',
-          xAxis: 'period',
-          yAxis: sheetData.indicators,
-          chartType: 'bar',
-          overlayRatio: false,
-        });
-
-        // Add to history
+      setTimeout(async () => {
+        const newId = `${Date.now()}-${file.name}`;
         const newItem: UploadHistoryItem = {
-          id: `${Date.now()}-${file.name}`,
+          id: newId,
           name: file.name,
           size: file.size,
           sheetCount: parsedFile.sheetNames.length,
@@ -123,14 +258,53 @@ export function useDashboardState() {
           }),
           status: 'success',
           fileData: parsedFile,
+          category: redirectTab,
         };
 
         const updatedHistory = [newItem, ...history.filter(h => h.name !== file.name)];
         setHistory(updatedHistory);
         localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
 
+        const updatedActiveIds = {
+          ...activeFileIds,
+          [redirectTab]: newId,
+        };
+        setActiveFileIds(updatedActiveIds);
+
+        // Sync uploaded data to Next.js server so Ngrok users see it instantly!
+        try {
+          await fetch('/api/data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              historyItem: newItem,
+              activeFileIds: { [redirectTab]: newId }
+            })
+          });
+        } catch (err) {
+          console.warn('Failed to sync upload to server API:', err);
+        }
+
+        const firstSheet = parsedFile.sheetNames[0];
+        const sheetData = parsedFile.sheets[firstSheet];
+
+        setFilterStates(prev => ({
+          ...prev,
+          [redirectTab]: {
+            sheet: firstSheet,
+            year: 'All',
+            month: 'All',
+            xAxis: 'period',
+            yAxis: sheetData?.indicators || [],
+            chartType: 'bar',
+            overlayRatio: false,
+            selectedYears: [],
+            selectedMonths: [],
+          }
+        }));
+
         setLoading(false);
-        setActiveTab('dashboard'); // Redirect to dashboard to show upload results
+        setActiveTab(redirectTab);
       }, 500);
 
     } catch (error) {
@@ -139,7 +313,6 @@ export function useDashboardState() {
       const errMsg = error instanceof Error ? error.message : 'Format template tidak sesuai';
       setUploadError(errMsg);
 
-      // Save failed upload attempt in history for visibility
       const failedItem: UploadHistoryItem = {
         id: `${Date.now()}-${file.name}`,
         name: file.name,
@@ -154,7 +327,8 @@ export function useDashboardState() {
           minute: '2-digit'
         }),
         status: 'failed',
-        errorMessage: error instanceof Error ? error.message : 'Format template tidak sesuai',
+        errorMessage: errMsg,
+        category: redirectTab,
         fileData: {
           name: file.name,
           size: file.size,
@@ -165,7 +339,7 @@ export function useDashboardState() {
           rowCount: 0,
           totalIndicators: 0,
           totalPeriods: 0,
-          validationError: error instanceof Error ? error.message : 'Format template tidak sesuai'
+          validationError: errMsg
         }
       };
 
@@ -178,51 +352,98 @@ export function useDashboardState() {
   };
 
   // Delete History Item
-  const deleteHistoryItem = (id: string) => {
-    if (id === 'default-mock') {
+  const deleteHistoryItem = async (id: string) => {
+    if (id === 'default-mock-bank' || id === 'default-mock-kredit' || id === 'default-mock-dpk') {
       alert('File sampel default tidak dapat dihapus');
       return;
     }
+    const targetItem = history.find(h => h.id === id);
+    const category = targetItem?.category || 'bank_umum';
+
     const updatedHistory = history.filter(item => item.id !== id);
     setHistory(updatedHistory);
     localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
 
-    // If deleting currently active file, fall back to default mock
-    if (activeFile && history.find(h => h.id === id)?.name === activeFile.name) {
-      const mock = history.find(h => h.id === 'default-mock')?.fileData || generateMockFile();
-      setActiveFile(mock);
-      const sheet = mock.sheetNames[0];
-      setFilterState({
-        sheet,
-        year: 'All',
-        month: 'All',
-        xAxis: 'period',
-        yAxis: mock.sheets[sheet].indicators,
-        chartType: 'bar',
-        overlayRatio: false,
+    try {
+      await fetch('/api/data', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
       });
+    } catch (err) {
+      console.warn('Failed to sync deletion to server API:', err);
+    }
+
+    if (activeFileIds[category] === id) {
+      const defaultId = category === 'kredit_jenis' ? 'default-mock-kredit' : category === 'dpk_portofolio' ? 'default-mock-dpk' : 'default-mock-bank';
+      setActiveFileIds(prev => ({
+        ...prev,
+        [category]: defaultId
+      }));
+
+      const mockItem = updatedHistory.find(h => h.id === defaultId);
+      if (mockItem && mockItem.fileData) {
+        const sheet = mockItem.fileData.sheetNames[0];
+        setFilterStates(prev => ({
+          ...prev,
+          [category]: {
+            sheet,
+            year: 'All',
+            month: 'All',
+            xAxis: 'period',
+            yAxis: mockItem.fileData?.sheets[sheet]?.indicators || [],
+            chartType: 'bar',
+            overlayRatio: false,
+            selectedYears: [],
+            selectedMonths: [],
+          }
+        }));
+      }
     }
   };
 
   // Load File from History
-  const loadHistoryItem = (id: string) => {
+  const loadHistoryItem = async (id: string, redirectTab: string = 'bank_umum') => {
     const item = history.find(h => h.id === id);
-    if (item && item.status === 'success') {
+    if (item && item.status === 'success' && item.fileData) {
       const file = item.fileData;
-      setActiveFile(file);
       const sheet = file.sheetNames[0];
-      setFilterState({
-        sheet,
-        year: 'All',
-        month: 'All',
-        xAxis: 'period',
-        yAxis: file.sheets[sheet].indicators,
-        chartType: 'bar',
-        overlayRatio: false,
-      });
-      setActiveTab('dashboard');
+
+      setActiveFileIds(prev => ({
+        ...prev,
+        [redirectTab]: id
+      }));
+
+      try {
+        await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activeFileIds: { [redirectTab]: id }
+          })
+        });
+      } catch (err) {
+        console.warn('Failed to sync active file to server API:', err);
+      }
+
+      setFilterStates(prev => ({
+        ...prev,
+        [redirectTab]: {
+          sheet,
+          year: 'All',
+          month: 'All',
+          xAxis: 'period',
+          yAxis: file.sheets[sheet]?.indicators || [],
+          chartType: 'bar',
+          overlayRatio: false,
+          selectedYears: [],
+          selectedMonths: [],
+        }
+      }));
+
+      setActiveTab(redirectTab);
     } else if (item && item.status === 'failed') {
-      alert(`File ini gagal diproses sebelumnya dengan error:\n${item.errorMessage}\n\nSilakan unggah kembali (upload ulang) file tersebut agar diproses oleh parser baru yang lebih fleksibel.`);
+      alert(`File ini gagal diproses sebelumnya dengan error:\n${item.errorMessage}\n\nSilakan unggah kembali file tersebut.`);
     }
   };
 
@@ -232,12 +453,13 @@ export function useDashboardState() {
     const sheetData = activeFile.sheets[sheetName];
     if (!sheetData) return;
 
-    setFilterState(prev => ({
-      ...prev,
+    setFilterState({
       sheet: sheetName,
       xAxis: 'period',
       yAxis: sheetData.indicators,
-    }));
+      selectedYears: [],
+      selectedMonths: [],
+    });
   };
 
   return {

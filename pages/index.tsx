@@ -18,6 +18,9 @@ import Reports from '../components/Reports';
 import TemplateDownload from '../components/TemplateDownload';
 import YoyAnalysis from '../components/YoyAnalysis';
 import YoyDashboardWidget from '../components/YoyDashboardWidget';
+import KreditJenisView from '../components/KreditJenisView';
+import DpkView from '../components/DpkView';
+import OverviewDashboard from '../components/OverviewDashboard';
 
 import { useDashboardState } from '../hooks/useDashboardState';
 
@@ -49,6 +52,36 @@ export default function Home() {
     }));
   };
 
+  // Tab change handler that automatically presets the correct sheet
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    
+    if (activeFile) {
+      if (tab === 'bank_umum') {
+        const sheet = Object.keys(activeFile.sheets).find(
+          (s) => s.toLowerCase().includes('bank') || s.toLowerCase().includes('umum')
+        );
+        if (sheet) {
+          handleSheetChange(sheet);
+        }
+      } else if (tab === 'kredit_jenis') {
+        const sheet = Object.keys(activeFile.sheets).find(
+          (s) => s.toLowerCase().includes('kredit') || s.toLowerCase().includes('jenis')
+        );
+        if (sheet) {
+          handleSheetChange(sheet);
+        }
+      } else if (tab === 'dpk_portofolio') {
+        const sheet = Object.keys(activeFile.sheets).find(
+          (s) => s.toLowerCase().includes('dpk') || s.toLowerCase().includes('portofolio')
+        );
+        if (sheet) {
+          handleSheetChange(sheet);
+        }
+      }
+    }
+  };
+
   // Run filters button
   const handleApplyFilters = () => {
     // We already update filters reactively on change, but this button
@@ -76,7 +109,7 @@ export default function Home() {
                 Unggah berkas laporan keuangan terlebih dahulu untuk mulai memanfaatkan panel analisis FINSIGHT.
               </p>
               <button
-                onClick={() => setActiveTab('upload')}
+                onClick={() => setActiveTab('bank_umum_upload')}
                 className="flex items-center gap-1.5 bg-[#C61E1E] text-white font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-[#A31818] transition-colors"
               >
                 <Upload size={14} />
@@ -87,56 +120,8 @@ export default function Home() {
         }
 
         return (
-          <motion.div {...pageTransition} className="space-y-6">
-            {/* Filter Panel Area */}
-            <FilterArea
-              activeFile={activeFile}
-              filterState={filterState}
-              onFilterChange={handleFilterChange}
-              onApplyFilters={handleApplyFilters}
-              onSheetChange={handleSheetChange}
-            />
-
-            {/* Total summary status cards */}
-            <SummaryCards 
-              activeFile={activeFile}
-              filterState={filterState}
-            />
-
-            {/* Visualizer Canvas Area */}
-            <div className="w-full">
-              <VisualizationArea
-                activeFile={activeFile}
-                filterState={filterState}
-              />
-            </div>
-
-            {/* YoY Nominal Growth Chart widget */}
-            <div className="w-full">
-              <YoyDashboardWidget
-                activeFile={activeFile}
-                filterState={filterState}
-              />
-            </div>
-
-            {/* Annual YoY comparison sparklines cards */}
-            <YearComparison
-              activeFile={activeFile}
-              filterState={filterState}
-            />
-
-            {/* Collapsible Per-Sheet details accordion list */}
-            <SheetSection
-              activeFile={activeFile}
-              onActivateSheet={handleSheetChange}
-            />
-
-            {/* Preview Data Grid Table */}
-            {activeFile.sheets[filterState.sheet] && (
-              <DataTable 
-                sheetData={activeFile.sheets[filterState.sheet]}
-              />
-            )}
+          <motion.div {...pageTransition}>
+            <OverviewDashboard activeFile={activeFile} onNavigateTab={handleTabChange} />
           </motion.div>
         );
 
@@ -154,11 +139,39 @@ export default function Home() {
           </motion.div>
         );
 
-      case 'upload':
+      case 'bank_umum_upload':
         return (
           <motion.div {...pageTransition}>
             <UploadCard
-              onUpload={handleUpload}
+              onUpload={(file) => handleUpload(file, 'bank_umum')}
+              activeFile={activeFile}
+              loading={loading}
+              progress={uploadProgress}
+              error={uploadError}
+              onErrorClose={() => setUploadError(null)}
+            />
+          </motion.div>
+        );
+
+      case 'kredit_jenis_upload':
+        return (
+          <motion.div {...pageTransition}>
+            <UploadCard
+              onUpload={(file) => handleUpload(file, 'kredit_jenis')}
+              activeFile={activeFile}
+              loading={loading}
+              progress={uploadProgress}
+              error={uploadError}
+              onErrorClose={() => setUploadError(null)}
+            />
+          </motion.div>
+        );
+
+      case 'dpk_portofolio_upload':
+        return (
+          <motion.div {...pageTransition}>
+            <UploadCard
+              onUpload={(file) => handleUpload(file, 'dpk_portofolio')}
               activeFile={activeFile}
               loading={loading}
               progress={uploadProgress}
@@ -175,23 +188,58 @@ export default function Home() {
           </motion.div>
         );
 
-      case 'history':
+      case 'bank_umum_history':
         return (
           <motion.div {...pageTransition}>
             <UploadHistory
-              history={history}
-              onLoadItem={loadHistoryItem}
+              history={history.filter(h => h.category === 'bank_umum')}
+              onLoadItem={(id) => loadHistoryItem(id, 'bank_umum')}
               onDeleteItem={deleteHistoryItem}
               activeFileName={activeFile?.name}
             />
           </motion.div>
         );
 
-      case 'visualisasi':
+      case 'kredit_jenis_history':
+        return (
+          <motion.div {...pageTransition}>
+            <UploadHistory
+              history={history.filter(h => h.category === 'kredit_jenis')}
+              onLoadItem={(id) => loadHistoryItem(id, 'kredit_jenis')}
+              onDeleteItem={deleteHistoryItem}
+              activeFileName={activeFile?.name}
+            />
+          </motion.div>
+        );
+
+      case 'dpk_portofolio_history':
+        return (
+          <motion.div {...pageTransition}>
+            <UploadHistory
+              history={history.filter(h => h.category === 'dpk_portofolio')}
+              onLoadItem={(id) => loadHistoryItem(id, 'dpk_portofolio')}
+              onDeleteItem={deleteHistoryItem}
+              activeFileName={activeFile?.name}
+            />
+          </motion.div>
+        );
+
+      case 'bank_umum':
         if (!activeFile) {
           return (
-            <div className="text-center py-20 text-slate-400">
-              <p className="text-xs font-semibold">Harap unggah file Excel terlebih dahulu</p>
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white border border-slate-100 rounded-2xl p-8 max-w-xl mx-auto shadow-soft mt-8">
+              <FileWarning size={36} className="text-[#C61E1E] opacity-40 mb-3 animate-pulse" />
+              <h3 className="font-bold text-slate-800 text-sm">Belum Ada File Excel Aktif</h3>
+              <p className="text-xs text-slate-400 text-center mt-1 mb-6">
+                Unggah berkas laporan keuangan terlebih dahulu untuk mulai memanfaatkan panel analisis FINSIGHT.
+              </p>
+              <button
+                onClick={() => setActiveTab('bank_umum_upload')}
+                className="flex items-center gap-1.5 bg-[#C61E1E] text-white font-bold text-xs px-4 py-2.5 rounded-xl hover:bg-[#A31818] transition-colors"
+              >
+                <Upload size={14} />
+                <span>Upload Sekarang</span>
+              </button>
             </div>
           );
         }
@@ -208,6 +256,31 @@ export default function Home() {
               activeFile={activeFile}
               filterState={filterState}
             />
+            <YoyAnalysis 
+              activeFile={activeFile}
+              defaultSheet={filterState.sheet}
+              hideSheetSelect={true}
+            />
+            {(() => {
+              const tableSheet = activeFile.sheets[filterState.sheet] 
+                || activeFile.sheets[activeFile.activeSheetName]
+                || activeFile.sheets[activeFile.sheetNames[0]];
+              return tableSheet ? <DataTable sheetData={tableSheet} /> : null;
+            })()}
+          </motion.div>
+        );
+
+      case 'kredit_jenis':
+        return (
+          <motion.div {...pageTransition}>
+            <KreditJenisView activeFile={activeFile} />
+          </motion.div>
+        );
+
+      case 'dpk_portofolio':
+        return (
+          <motion.div {...pageTransition}>
+            <DpkView activeFile={activeFile} />
           </motion.div>
         );
 
@@ -256,7 +329,7 @@ export default function Home() {
 
       <Layout
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
         activeFile={activeFile}

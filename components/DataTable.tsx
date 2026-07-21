@@ -22,10 +22,14 @@ export default function DataTable({ sheetData }: DataTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  // Initialize visibleColumns from sheetData immediately (lazy initializer avoids empty first render)
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => sheetData?.columns ?? []);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
   const [colDropdownOpen, setColDropdownOpen] = useState(false);
+
+  // Guard: don't render if sheetData has no data
+  if (!sheetData || sheetData.data.length === 0) return null;
 
   // Check if a row represents a percentage indicator and if it's decimal-scaled
   const rowFormatSpecs = useMemo(() => {
@@ -377,20 +381,57 @@ export default function DataTable({ sheetData }: DataTableProps) {
                               </span>
                             )}
                             <span className="truncate">
-                              {val === null || val === undefined 
-                                ? '-' 
-                                : isNumeric && typeof val === 'number' 
-                                  ? (() => {
-                                      const spec = rowFormatSpecs[row.indicator];
-                                      if (spec?.isPercent) {
-                                        return spec.isDecimalScaled 
-                                          ? `${(val * 100).toLocaleString('id-ID')}%` 
-                                          : `${val.toLocaleString('id-ID')}%`;
-                                      }
-                                      return val.toLocaleString('id-ID');
-                                    })()
-                                  : String(val)
-                              }
+                              {(() => {
+                                if (val === null || val === undefined || val === '') return '-';
+                                if (!isNumeric || typeof val !== 'number') return String(val);
+
+                                const colLower = String(col).toLowerCase();
+                                const indLower = String(row.indicator || '').toLowerCase();
+
+                                const isPercentCol = 
+                                  colLower.includes('yoy') || 
+                                  colLower.includes('share') || 
+                                  colLower.includes('pertumbuhan') || 
+                                  colLower.includes('%') || 
+                                  colLower.includes('rasio') || 
+                                  colLower.includes('ratio');
+
+                                const isPercentInd = 
+                                  indLower.includes('npl') || 
+                                  indLower.includes('ldr') || 
+                                  indLower.includes('car') || 
+                                  indLower.includes('roa') || 
+                                  indLower.includes('roe') || 
+                                  indLower.includes('nim') || 
+                                  indLower.includes('bopo') || 
+                                  indLower.includes('%') || 
+                                  indLower.includes('rasio') || 
+                                  indLower.includes('ratio') || 
+                                  indLower.includes('pertumbuhan') || 
+                                  indLower.includes('growth') || 
+                                  indLower.includes('rate');
+
+                                if (isPercentCol || isPercentInd) {
+                                  const isLargeRatio = 
+                                    indLower.includes('ldr') || 
+                                    indLower.includes('bopo') || 
+                                    indLower.includes('car') || 
+                                    indLower.includes('roe') || 
+                                    indLower.includes('nim') || 
+                                    indLower.includes('capital') || 
+                                    colLower.includes('ldr') || 
+                                    colLower.includes('bopo') || 
+                                    colLower.includes('car');
+
+                                  const maxDecimalThreshold = isLargeRatio ? 2.5 : 1.0;
+                                  const isDecimalScaled = Math.abs(val) <= maxDecimalThreshold;
+
+                                  const pctVal = isDecimalScaled ? val * 100 : val;
+                                  return `${pctVal.toLocaleString('id-ID', { maximumFractionDigits: 2 })}%`;
+                                }
+
+                                return val.toLocaleString('id-ID');
+                              })()}
                             </span>
                           </div>
                         </td>

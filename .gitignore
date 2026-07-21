@@ -88,3 +88,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local cache
+.data_cache.json
+

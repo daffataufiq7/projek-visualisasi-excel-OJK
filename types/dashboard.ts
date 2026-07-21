@@ -36,6 +36,7 @@ export interface ActiveFile {
   totalIndicators: number;
   totalPeriods: number;
   validationError?: string; // If validation failed, store details here
+  isSample?: boolean;
 }
 
 export interface FilterState {
@@ -46,6 +47,8 @@ export interface FilterState {
   yAxis: string[]; // Will hold selected indicators: ['Aset', 'Kredit']
   chartType: 'bar' | 'line' | 'area' | 'pie' | 'horizontal_bar';
   overlayRatio?: boolean;
+  selectedYears?: string[];
+  selectedMonths?: string[];
 }
 
 export interface UploadHistoryItem {
@@ -57,6 +60,7 @@ export interface UploadHistoryItem {
   uploadDate: string;
   status: 'success' | 'failed';
   errorMessage?: string;
-  fileData: ActiveFile;
+  fileData?: ActiveFile;
+  category?: string; // 'bank_umum' | 'kredit_jenis' | 'dpk_portofolio'
+  isSample?: boolean;
 }
-

@@ -106,25 +106,53 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
 
   const activeSheetData = activeFile.sheets[filterState.sheet] || activeFile.sheets[activeFile.activeSheetName];
 
+  // Filter yAxis to ONLY contain indicators that belong to activeSheetData AND have at least 1 non-zero value
+  const activeYAxis = useMemo(() => {
+    if (!activeSheetData) return [];
+    return filterState.yAxis.filter((indicator) => {
+      if (!activeSheetData.indicators.includes(indicator)) return false;
+      const indData = activeSheetData.indicatorsData[indicator];
+      if (!indData) return false;
+      return Object.values(indData).some(val => val !== 0 && val !== null && val !== undefined);
+    });
+  }, [activeSheetData, filterState.yAxis]);
+
   // Format and filter the data based on selected indicators, year, and month
   const filteredData = useMemo(() => {
     if (!activeSheetData) return [];
 
     const result: any[] = [];
+    const hasSelectedYears = filterState.selectedYears && filterState.selectedYears.length > 0;
+    const hasSelectedMonths = filterState.selectedMonths && filterState.selectedMonths.length > 0;
 
     activeSheetData.periods.forEach((periodKey) => {
+      const pUpper = String(periodKey).trim().toUpperCase();
+      if (pUpper === 'YOY' || pUpper === 'SHARE') {
+        return; // Exclude metric calculation columns from time-series trend charts
+      }
+
       const yr = periodKey.split('-')[0];
       const mo = periodKey.split('-')[1];
 
-      // Filter by year if selected
-      if (filterState.year !== 'All' && yr !== filterState.year) {
+      // Multi-select year filter takes priority, otherwise falls back to single-select year filter
+      if (hasSelectedYears) {
+        if (!filterState.selectedYears?.includes(yr)) {
+          return;
+        }
+      } else if (filterState.year !== 'All' && yr !== filterState.year) {
         return;
       }
 
-      // Filter by month if selected (only if sheet contains months)
+      // Multi-select month filter takes priority, otherwise falls back to single-select month filter
       const hasMonths = activeSheetData.months && activeSheetData.months.length > 0;
-      if (hasMonths && filterState.month !== 'All' && mo !== filterState.month) {
-        return;
+      if (hasMonths) {
+        if (hasSelectedMonths) {
+          if (!mo || !filterState.selectedMonths?.includes(mo)) {
+            return;
+          }
+        } else if (filterState.month !== 'All' && mo !== filterState.month) {
+          return;
+        }
       }
 
       const dataPoint: any = {
@@ -134,7 +162,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
       };
 
       // Append values for selected indicators using safe alphanumeric keys
-      filterState.yAxis.forEach((indicator) => {
+      activeYAxis.forEach((indicator) => {
         const indIdx = activeSheetData.indicators.indexOf(indicator);
         const safeKey = `ind_${indIdx}`;
         dataPoint[safeKey] = activeSheetData.indicatorsData[indicator]?.[periodKey] ?? 0;
@@ -144,7 +172,14 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     });
 
     return result;
-  }, [activeSheetData, filterState.year, filterState.month, filterState.yAxis]);
+  }, [
+    activeSheetData, 
+    filterState.year, 
+    filterState.month, 
+    activeYAxis, 
+    filterState.selectedYears, 
+    filterState.selectedMonths
+  ]);
 
   // Unit specifications and active factor
   const unitSpec = useMemo(() => {
@@ -162,7 +197,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
 
     let maxVal = 0;
     if (activeSheetData && filteredData.length > 0) {
-      filterState.yAxis.forEach((indicator) => {
+      activeYAxis.forEach((indicator) => {
         const indicatorName = indicator.toLowerCase();
         const isPercent = 
           indicatorName.includes('npl') || 
@@ -197,7 +232,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     if (maxVal >= 1e6) return specs.million;
     if (maxVal >= 1e3) return specs.thousand;
     return specs.raw;
-  }, [unitType, filteredData, filterState.yAxis, activeSheetData]);
+  }, [unitType, filteredData, activeYAxis, activeSheetData]);
 
   // Check which percentage indicators in the current sheet are decimal-scaled (i.e. values are <= 1.0)
   const isDecimalScaledMap = useMemo(() => {
@@ -253,7 +288,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     if (!activeSheetData || filteredData.length === 0) return 100;
     
     let maxVal = 0;
-    filterState.yAxis.forEach((indicator) => {
+    activeYAxis.forEach((indicator) => {
       const indicatorName = indicator.toLowerCase();
       const isPercent = 
         indicatorName.includes('npl') || 
@@ -282,7 +317,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
       }
     });
     return maxVal || 100;
-  }, [activeSheetData, filteredData, filterState.yAxis, unitSpec]);
+  }, [activeSheetData, filteredData, activeYAxis, unitSpec]);
 
   // Scaled and rounded chart data
   const chartData = useMemo(() => {
@@ -290,7 +325,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     
     // First, calculate max value for each indicator across the active periods
     const indicatorMaxMap: { [safeKey: string]: number } = {};
-    filterState.yAxis.forEach((indicator) => {
+    activeYAxis.forEach((indicator) => {
       const indIdx = activeSheetData.indicators.indexOf(indicator);
       const safeKey = `ind_${indIdx}`;
       let maxVal = 0;
@@ -305,7 +340,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
 
     return filteredData.map((d) => {
       const newD = { ...d };
-      filterState.yAxis.forEach((indicator) => {
+      activeYAxis.forEach((indicator) => {
         const indIdx = activeSheetData.indicators.indexOf(indicator);
         const safeKey = `ind_${indIdx}`;
         
@@ -336,7 +371,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
             
             if (filterState.overlayRatio) {
               // Find index of this percentage indicator among all selected percentage indicators
-              const pctIndicators = filterState.yAxis.filter((ind) => {
+              const pctIndicators = activeYAxis.filter((ind) => {
                 const name = ind.toLowerCase();
                 return (
                   name.includes('npl') || 
@@ -374,14 +409,14 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
       });
       return newD;
     });
-  }, [filteredData, unitSpec, filterState.yAxis, activeSheetData, isDecimalScaledMap, filterState.overlayRatio, leftMax]);
+  }, [filteredData, unitSpec, activeYAxis, activeSheetData, isDecimalScaledMap, filterState.overlayRatio, leftMax]);
 
   // Calculate dynamic domain for the right Y Axis (percentage values)
   const rightAxisDomain = useMemo(() => {
     if (!activeSheetData || chartData.length === 0) return [0, 10];
     
     let maxPct = 0;
-    filterState.yAxis.forEach((indicator) => {
+    activeYAxis.forEach((indicator) => {
       const indicatorName = indicator.toLowerCase();
       const isPercent = 
         indicatorName.includes('npl') || 
@@ -415,7 +450,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     // Position the line in the middle height of the graph (around 45% - 50% height) by multiplying maxPct by 2.2
     const maxDomain = Math.max(10, Math.ceil(maxPct * 2.2));
     return [0, maxDomain];
-  }, [activeSheetData, chartData, filterState.yAxis]);
+  }, [activeSheetData, chartData, activeYAxis]);
 
   // Determine if dual Y-axes are needed based on selected series scale differences
   const { useDualAxis, smallKeys } = useMemo(() => {
@@ -601,6 +636,23 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
     img.src = url;
   };
 
+  const getUnitAbbreviation = (shortLabel: string) => {
+    if (!shortLabel) return '';
+    const l = shortLabel.toLowerCase();
+    if (l.includes('triliun')) return ' T';
+    if (l.includes('miliar')) return ' M';
+    if (l.includes('juta')) return ' Jt';
+    if (l.includes('ribu')) return ' Rb';
+    return ` ${shortLabel}`;
+  };
+
+  const formatCurrencyLabel = (val: any) => {
+    if (typeof val !== 'number') return val;
+    const abbr = getUnitAbbreviation(unitSpec.shortLabel);
+    const numStr = val.toLocaleString('id-ID');
+    return `${numStr}${abbr}`;
+  };
+
   // Custom tooltips (styled minimal, Vercel/Linear look)
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -619,7 +671,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
               const formattedVal = typeof displayVal === 'number'
                 ? isPercentage
                   ? `${displayVal.toLocaleString('id-ID')}%`
-                  : `${displayVal.toLocaleString('id-ID')}${unitSpec.shortLabel ? ` ${unitSpec.shortLabel}` : ''}`
+                  : formatCurrencyLabel(displayVal)
                 : displayVal;
               return (
                 <div key={index} className="flex items-center gap-4 justify-between">
@@ -682,7 +734,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
           <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
           
           {/* First, render all Bar components (nominal indicators) */}
-          {filterState.yAxis.map((indicator) => {
+          {activeYAxis.map((indicator) => {
             const indIdx = activeSheetData.indicators.indexOf(indicator);
             const safeKey = `ind_${indIdx}`;
             
@@ -717,7 +769,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                     fill: '#475569',
                     fontSize: 9,
                     fontWeight: 'bold',
-                    formatter: (val: any) => typeof val === 'number' ? val.toLocaleString('id-ID') : val
+                    formatter: (val: any) => formatCurrencyLabel(val)
                   }}
                 />
               );
@@ -726,7 +778,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
           })}
 
           {/* Second, render all Line components (percentage indicators) so they are drawn ON TOP of the bars */}
-          {filterState.yAxis.map((indicator) => {
+          {activeYAxis.map((indicator) => {
             const indIdx = activeSheetData.indicators.indexOf(indicator);
             const safeKey = `ind_${indIdx}`;
             
@@ -797,7 +849,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
             )}
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.02)' }} />
             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
-            {filterState.yAxis
+            {activeYAxis
               .filter((indicator) => {
                 const indicatorName = indicator.toLowerCase();
                 const isPercent = 
@@ -834,7 +886,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                       fill: '#475569',
                       fontSize: 9,
                       fontWeight: 'bold',
-                      formatter: (val: any) => typeof val === 'number' ? val.toLocaleString('id-ID') : val
+                      formatter: (val: any) => formatCurrencyLabel(val)
                     }}
                   />
                 );
@@ -863,7 +915,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
             )}
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
-            {filterState.yAxis.map((indicator) => {
+            {activeYAxis.map((indicator) => {
               const indIdx = activeSheetData.indicators.indexOf(indicator);
               const safeKey = `ind_${indIdx}`;
               const axisId = useDualAxis && smallKeys.has(safeKey) ? 'right' : 'left';
@@ -890,7 +942,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
         return (
           <AreaChart data={chartData} margin={margin}>
             <defs>
-              {filterState.yAxis.map((indicator) => {
+              {activeYAxis.map((indicator) => {
                 const indIdx = activeSheetData.indicators.indexOf(indicator);
                 return (
                   <linearGradient key={indicator} id={`grad-${indIdx}`} x1="0" y1="0" x2="0" y2="1">
@@ -917,7 +969,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
             )}
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
-            {filterState.yAxis.map((indicator) => {
+            {activeYAxis.map((indicator) => {
               const indIdx = activeSheetData.indicators.indexOf(indicator);
               const safeKey = `ind_${indIdx}`;
               const axisId = useDualAxis && smallKeys.has(safeKey) ? 'right' : 'left';
@@ -942,7 +994,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
 
       case 'pie':
         // Sum values across filtered periods for each indicator
-        const pieData = filterState.yAxis.map((indicator) => {
+        const pieData = activeYAxis.map((indicator) => {
           const indIdx = activeSheetData.indicators.indexOf(indicator);
           const safeKey = `ind_${indIdx}`;
           let sum = 0;
@@ -984,7 +1036,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
             <YAxis dataKey="period" type="category" tick={{ fontSize: 9, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} width={80} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.01)' }} />
             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 600, color: '#64748B', paddingTop: 10 }} iconType="circle" />
-            {filterState.yAxis
+            {activeYAxis
               .filter((indicator) => {
                 const indicatorName = indicator.toLowerCase();
                 const isPercent = 
@@ -1019,7 +1071,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                       fill: '#475569',
                       fontSize: 9,
                       fontWeight: 'bold',
-                      formatter: (val: any) => typeof val === 'number' ? val.toLocaleString('id-ID') : val
+                      formatter: (val: any) => formatCurrencyLabel(val)
                     }}
                   />
                 );

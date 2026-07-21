@@ -18,9 +18,10 @@ export default function FilterArea({
 }: FilterAreaProps) {
   const activeSheetData = activeFile.sheets[filterState.sheet] || activeFile.sheets[activeFile.activeSheetName];
 
+  const [yearDropdownOpen, setYearDropdownOpen] = React.useState(false);
+  const [monthDropdownOpen, setMonthDropdownOpen] = React.useState(false);
+
   const indicators = activeSheetData?.indicators || [];
-  const years = ['All', ...(activeSheetData?.years || [])];
-  const months = ['All', ...(activeSheetData?.months || [])];
 
   const handleIndicatorToggle = (indName: string) => {
     const isSelected = filterState.yAxis.includes(indName);
@@ -31,6 +32,20 @@ export default function FilterArea({
       newY = [...filterState.yAxis, indName];
     }
     onFilterChange({ yAxis: newY });
+  };
+
+  const getSelectedYearsLabel = () => {
+    const selected = filterState.selectedYears || [];
+    if (selected.length === 0) return 'Semua Tahun (Tren)';
+    if (selected.length === activeSheetData?.years?.length) return 'Semua Tahun';
+    return selected.join(', ');
+  };
+
+  const getSelectedMonthsLabel = () => {
+    const selected = filterState.selectedMonths || [];
+    if (selected.length === 0) return 'Semua Bulan';
+    if (selected.length === activeSheetData?.months?.length) return 'Semua Bulan';
+    return selected.join(', ');
   };
 
   return (
@@ -61,47 +76,169 @@ export default function FilterArea({
         </div>
 
         {/* 2. Pilih Tahun */}
-        <div className="flex flex-col space-y-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">2. Rentang Tahun</label>
+        <div className="flex flex-col space-y-1.5 relative">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            2. Rentang Tahun
+          </label>
           <div className="relative">
-            <select
-              value={filterState.year}
-              onChange={(e) => onFilterChange({ year: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] focus:border-[#C61E1E] cursor-pointer"
+            <button
+              type="button"
+              onClick={() => {
+                setYearDropdownOpen(!yearDropdownOpen);
+                setMonthDropdownOpen(false);
+              }}
+              className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 text-left flex items-center justify-between focus:outline-none focus:ring-1 focus:ring-[#C61E1E]"
             >
-              {years.map((y) => (
-                <option key={y} value={y}>{y === 'All' ? 'Semua Tahun (Tren)' : y}</option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <span className="truncate">{getSelectedYearsLabel()}</span>
+              <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+            </button>
+
+            {yearDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setYearDropdownOpen(false)} />
+                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-100 rounded-xl shadow-lg z-40 max-h-[220px] overflow-y-auto p-2 space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onFilterChange({ selectedYears: [] });
+                      setYearDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-xs rounded-lg font-bold flex items-center justify-between ${
+                      (filterState.selectedYears || []).length === 0
+                        ? 'bg-slate-50 text-[#C61E1E]'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>Semua Tahun (Tren)</span>
+                    {(filterState.selectedYears || []).length === 0 && <Check size={12} className="text-[#C61E1E]" />}
+                  </button>
+
+                  <div className="border-t border-slate-50 my-1" />
+
+                  {activeSheetData?.years?.map((y) => {
+                    const isSelected = filterState.selectedYears?.includes(y) ?? false;
+                    return (
+                      <button
+                        key={y}
+                        type="button"
+                        onClick={() => {
+                          const current = filterState.selectedYears || [];
+                          const next = current.includes(y) 
+                            ? current.filter(item => item !== y) 
+                            : [...current, y];
+                          onFilterChange({ selectedYears: next });
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs rounded-lg font-semibold flex items-center justify-between ${
+                          isSelected
+                            ? 'bg-[#C61E1E]/5 text-[#C61E1E] font-bold'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            readOnly
+                            className="rounded border-slate-300 text-[#C61E1E] focus:ring-[#C61E1E] w-3.5 h-3.5"
+                          />
+                          <span>{y}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         {/* 3. Pilih Bulan */}
-        <div className="flex flex-col space-y-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">3. Periode Bulan</label>
+        <div className="flex flex-col space-y-1.5 relative">
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            3. Periode Bulan
+          </label>
           <div className="relative">
-            <select
-              value={filterState.month}
-              onChange={(e) => onFilterChange({ month: e.target.value })}
+            <button
+              type="button"
               disabled={activeSheetData?.months?.length === 0}
-              className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] focus:border-[#C61E1E] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={() => {
+                setMonthDropdownOpen(!monthDropdownOpen);
+                setYearDropdownOpen(false);
+              }}
+              className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 text-left flex items-center justify-between focus:outline-none focus:ring-1 focus:ring-[#C61E1E] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {activeSheetData?.months?.length === 0 ? (
-                <option value="All">Tidak ada bulan (Tahunan)</option>
-              ) : (
-                months.map((m) => (
-                  <option key={m} value={m}>{m === 'All' ? 'Semua Bulan' : m}</option>
-                ))
-              )}
-            </select>
-            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <span className="truncate">
+                {activeSheetData?.months?.length === 0 
+                  ? 'Tidak ada bulan (Tahunan)' 
+                  : getSelectedMonthsLabel()}
+              </span>
+              <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+            </button>
+
+            {monthDropdownOpen && activeSheetData?.months?.length > 0 && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setMonthDropdownOpen(false)} />
+                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-100 rounded-xl shadow-lg z-40 max-h-[220px] overflow-y-auto p-2 space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onFilterChange({ selectedMonths: [] });
+                      setMonthDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-xs rounded-lg font-bold flex items-center justify-between ${
+                      (filterState.selectedMonths || []).length === 0
+                        ? 'bg-slate-50 text-[#C61E1E]'
+                        : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>Semua Bulan</span>
+                    {(filterState.selectedMonths || []).length === 0 && <Check size={12} className="text-[#C61E1E]" />}
+                  </button>
+
+                  <div className="border-t border-slate-50 my-1" />
+
+                  {activeSheetData?.months?.map((m) => {
+                    const isSelected = filterState.selectedMonths?.includes(m) ?? false;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          const current = filterState.selectedMonths || [];
+                          const next = current.includes(m) 
+                            ? current.filter(item => item !== m) 
+                            : [...current, m];
+                          onFilterChange({ selectedMonths: next });
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs rounded-lg font-semibold flex items-center justify-between ${
+                          isSelected
+                            ? 'bg-[#C61E1E]/5 text-[#C61E1E] font-bold'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            readOnly
+                            className="rounded border-slate-300 text-[#C61E1E] focus:ring-[#C61E1E] w-3.5 h-3.5"
+                          />
+                          <span>{m}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         {/* 4. Tipe Grafik */}
         <div className="flex flex-col space-y-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">4. Jenis Grafik</label>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            4. Jenis Grafik
+          </label>
           <div className="relative">
             <select
               value={filterState.chartType}
@@ -120,7 +257,9 @@ export default function FilterArea({
 
         {/* 5. Overlay Rasio */}
         <div className="flex flex-col space-y-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">5. Overlay Rasio</label>
+          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            5. Overlay Rasio
+          </label>
           <div className="flex items-center h-full">
             <label className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200/80 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors w-full select-none">
               <input

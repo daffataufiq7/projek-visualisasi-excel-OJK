@@ -1,23 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   Cell,
   LabelList
 } from 'recharts';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  AlertCircle, 
-  Calendar, 
-  Check, 
+import {
+  TrendingUp,
+  TrendingDown,
+  AlertCircle,
+  Calendar,
+  Check,
   ChevronDown,
   Info,
   Layers,
@@ -27,6 +27,8 @@ import { ActiveFile } from '../types/dashboard';
 
 interface YoyAnalysisProps {
   activeFile: ActiveFile;
+  defaultSheet?: string;
+  hideSheetSelect?: boolean;
 }
 
 interface YoyItem {
@@ -40,95 +42,194 @@ interface YoyItem {
   errorMessage: string;
 }
 
-export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
+export default function YoyAnalysis({ activeFile, defaultSheet, hideSheetSelect = false }: YoyAnalysisProps) {
   const sheetNames = activeFile.sheetNames;
-  const [selectedSheet, setSelectedSheet] = useState<string>(sheetNames[0] || '');
+  const [selectedSheet, setSelectedSheet] = useState<string>(defaultSheet || sheetNames[0] || '');
+
+  // Keep selectedSheet in sync with defaultSheet if it changes
+  React.useEffect(() => {
+    if (defaultSheet && defaultSheet !== selectedSheet && sheetNames.includes(defaultSheet)) {
+      setSelectedSheet(defaultSheet);
+    }
+  }, [defaultSheet, selectedSheet, sheetNames]);
 
   const sheetData = useMemo(() => {
     return activeFile.sheets[selectedSheet];
   }, [activeFile, selectedSheet]);
 
-  // Target years that have a previous year available in the sheet
+  // All available years in the sheet sorted ascending
   const targetYears = useMemo(() => {
     if (!sheetData) return [];
-    return sheetData.years.filter(yr => {
-      const prevYr = String(Number(yr) - 1);
-      return sheetData.years.includes(prevYr);
-    }).sort();
+    const validYears = sheetData.years.filter(yr => yr && yr !== 'All' && /^\d{4}$/.test(yr)).sort();
+    return validYears.length > 0 ? validYears : sheetData.years.filter(yr => yr && yr !== 'All').sort();
   }, [sheetData]);
 
   const [selectedYear, setSelectedYear] = useState<string>('');
-  
-  // Set default target year when sheet changes
+
+  // Set default target year when invalid or empty, preserving user's choice
   React.useEffect(() => {
     if (targetYears.length > 0) {
-      setSelectedYear(targetYears[targetYears.length - 1]);
+      if (!selectedYear || !targetYears.includes(selectedYear)) {
+        setSelectedYear(targetYears[targetYears.length - 1]);
+      }
     } else {
       setSelectedYear('');
     }
-  }, [targetYears]);
+  }, [targetYears, selectedYear]);
 
-  const hasMonths = sheetData?.months && sheetData.months.length > 0;
   const [selectedMonth, setSelectedMonth] = useState<string>('');
 
-  // Set default target month when sheet changes
+  // Previous comparison year: either selectedYear - 1, or the previous year in targetYears array
+  const prevYear = useMemo(() => {
+    if (!selectedYear || targetYears.length === 0) return '';
+    const numericYear = Number(selectedYear);
+    const directPrev = String(numericYear - 1);
+    if (targetYears.includes(directPrev)) return directPrev;
+    
+    const currIdx = targetYears.indexOf(selectedYear);
+    if (currIdx > 0) return targetYears[currIdx - 1];
+    if (targetYears.length > 1) return targetYears[0];
+    return selectedYear;
+  }, [selectedYear, targetYears]);
+
+  // Available months for YoY analysis: only months that exist in BOTH selectedYear and prevYear
+  const availableYoyMonths = useMemo(() => {
+    if (!sheetData || !sheetData.months || sheetData.months.length === 0) return [];
+    if (!selectedYear) return sheetData.months;
+
+    const targetMonths = sheetData.periods
+      .filter(p => p.startsWith(`${selectedYear}-`))
+      .map(p => p.split('-')[1])
+      .filter(Boolean);
+
+    if (!prevYear || prevYear === selectedYear) {
+      return targetMonths.length > 0 ? targetMonths : sheetData.months;
+    }
+
+    const prevMonths = sheetData.periods
+      .filter(p => p.startsWith(`${prevYear}-`))
+      .map(p => p.split('-')[1])
+      .filter(Boolean);
+
+    const commonMonths = targetMonths.filter(m => prevMonths.includes(m));
+
+    if (commonMonths.length > 0) {
+      return commonMonths;
+    }
+    return targetMonths.length > 0 ? targetMonths : sheetData.months;
+  }, [sheetData, selectedYear, prevYear]);
+
+  const hasMonths = availableYoyMonths.length > 0;
+
+  // Preserve selected month if valid in availableYoyMonths; otherwise default to the latest available month
   React.useEffect(() => {
-    if (hasMonths && sheetData.months.length > 0) {
-      setSelectedMonth(sheetData.months[0]);
+    if (availableYoyMonths.length > 0) {
+      if (!selectedMonth || !availableYoyMonths.includes(selectedMonth)) {
+        setSelectedMonth(availableYoyMonths[availableYoyMonths.length - 1]);
+      }
     } else {
       setSelectedMonth('');
     }
-  }, [sheetData, hasMonths]);
+  }, [availableYoyMonths, selectedMonth]);
 
-  const prevYear = useMemo(() => {
-    if (!selectedYear) return '';
-    return String(Number(selectedYear) - 1);
-  }, [selectedYear]);
+  // Initialize indicators from sheetData on mount (so initial render has all checked)
+  const [selectedIndicators, setSelectedIndicators] = useState<string[]>(() => {
+    const initialSheet = activeFile.sheets[defaultSheet || sheetNames[0] || ''];
+    return initialSheet?.indicators ?? [];
+  });
+  const [indicatorDropdownOpen, setIndicatorDropdownOpen] = useState(false);
 
-  // Calculate YoY for all indicators in the sheet
+  // Re-select all indicators ONLY when the selected sheet changes (not on every sheetData re-reference)
+  React.useEffect(() => {
+    if (sheetData) {
+      setSelectedIndicators(sheetData.indicators);
+    } else {
+      setSelectedIndicators([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSheet]);
+
+  const getSelectedIndicatorsLabel = () => {
+    if (selectedIndicators.length === 0) return 'Pilih Indikator';
+    if (selectedIndicators.length === sheetData?.indicators?.length) return 'Semua Indikator';
+    return selectedIndicators.map(ind => ind.split('/')[0].split('(')[0].trim()).join(', ');
+  };
+
+  // Calculate YoY for all indicators in the sheet (with robust fallbacks for explicit YOY columns)
   const yoyDataList = useMemo((): YoyItem[] => {
-    if (!sheetData || !selectedYear) return [];
+    if (!sheetData) return [];
 
     const indicators = sheetData.indicators;
     const result: YoyItem[] = [];
+
+    // Build the list of non-YOY periods (exclude 'YOY' and 'SHARE' keys)
+    const dataPeriods = sheetData.periods.filter(p => p !== 'YOY' && p !== 'SHARE');
 
     indicators.forEach((ind) => {
       // Check if indicator is a ratio/percentage
       const isRatio = /npl|ldr|%|rasio|ratio|growth|pertumbuhan/i.test(ind);
 
-      let currentPeriod = selectedYear;
-      let prevPeriod = prevYear;
-
-      if (hasMonths && selectedMonth) {
-        currentPeriod = `${selectedYear}-${selectedMonth}`;
-        prevPeriod = `${prevYear}-${selectedMonth}`;
+      // --- Step 1: ALWAYS try reading the explicit YOY column first ---
+      const explicitYoyRaw = sheetData.indicatorsData[ind]?.['YOY'];
+      let explicitYoyPct: number | null = null;
+      if (explicitYoyRaw !== undefined && explicitYoyRaw !== null) {
+        const rawNum = typeof explicitYoyRaw === 'number'
+          ? explicitYoyRaw
+          : parseFloat(String(explicitYoyRaw).replace('%', '').trim());
+        if (!isNaN(rawNum) && rawNum !== 0) {
+          explicitYoyPct = Math.abs(rawNum) <= 1.0 ? rawNum * 100 : rawNum;
+        }
       }
 
-      const currentVal = sheetData.indicatorsData[ind]?.[currentPeriod];
-      const prevVal = sheetData.indicatorsData[ind]?.[prevPeriod];
-
-      if (currentVal === undefined || prevVal === undefined || prevVal === null || prevVal === 0) {
-        result.push({
-          indicator: ind,
-          isRatio,
-          prevVal: prevVal ?? null,
-          currentVal: currentVal ?? null,
-          changeVal: null,
-          pctChange: null,
-          status: 'failed',
-          errorMessage: 'YoY tidak dapat dihitung'
-        });
-      } else {
-        const changeVal = currentVal - prevVal;
-        let pctChange = 0;
-
-        if (isRatio) {
-          // Poin persentase (ppt)
-          pctChange = changeVal;
-        } else {
-          // Nominal percentage
-          pctChange = (changeVal / prevVal) * 100;
+      // Fallback explicit YOY from grid row data object
+      if (explicitYoyPct === null) {
+        const gridRow = sheetData.data.find(d => d.indicator === ind || d.indicator?.toLowerCase() === ind.toLowerCase());
+        const gridYoy = gridRow?.['YOY'] ?? gridRow?.['yoy'] ?? gridRow?.['YoY'];
+        if (gridYoy !== undefined && gridYoy !== null && gridYoy !== '') {
+          const rawNum = typeof gridYoy === 'number' ? gridYoy : parseFloat(String(gridYoy).replace('%', '').trim());
+          if (!isNaN(rawNum) && rawNum !== 0) {
+            explicitYoyPct = Math.abs(rawNum) <= 1.5 ? rawNum * 100 : rawNum;
+          }
         }
+      }
+
+      // --- Step 2: Determine current & prev period ---
+      let currentPeriod = '';
+      let prevPeriod = '';
+
+      if (hasMonths && selectedMonth && selectedYear) {
+        currentPeriod = `${selectedYear}-${selectedMonth}`;
+        prevPeriod = `${prevYear}-${selectedMonth}`;
+      } else if (selectedYear) {
+        currentPeriod = selectedYear;
+        prevPeriod = prevYear;
+      }
+
+      // Get current value — prefer the selected period, fallback to the last available period
+      let currentVal: number | undefined = undefined;
+      if (currentPeriod && sheetData.indicatorsData[ind]?.[currentPeriod] !== undefined) {
+        currentVal = sheetData.indicatorsData[ind][currentPeriod];
+      } else if (dataPeriods.length > 0) {
+        currentVal = sheetData.indicatorsData[ind]?.[dataPeriods[dataPeriods.length - 1]];
+      }
+
+      // Get prev value — prefer the selected prev period, fallback to the first available period
+      let prevVal: number | undefined = undefined;
+      if (prevPeriod && sheetData.indicatorsData[ind]?.[prevPeriod] !== undefined) {
+        prevVal = sheetData.indicatorsData[ind][prevPeriod];
+      } else if (dataPeriods.length > 1) {
+        prevVal = sheetData.indicatorsData[ind]?.[dataPeriods[0]];
+      }
+
+      let calculated = false;
+
+      // --- Step 3: Calculate from period data if both values available ---
+      if (
+        currentVal !== undefined && prevVal !== undefined &&
+        prevVal !== 0 && currentPeriod !== prevPeriod && currentPeriod !== '' && prevPeriod !== ''
+      ) {
+        const changeVal = currentVal - prevVal;
+        const pctChange = isRatio ? changeVal : (changeVal / prevVal) * 100;
 
         result.push({
           indicator: ind,
@@ -140,6 +241,35 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
           status: 'success',
           errorMessage: ''
         });
+        calculated = true;
+      }
+
+      // --- Step 4: Use explicit YOY column value as fallback ---
+      if (!calculated && explicitYoyPct !== null) {
+        result.push({
+          indicator: ind,
+          isRatio,
+          prevVal: prevVal ?? 0,
+          currentVal: currentVal ?? 0,
+          changeVal: null,
+          pctChange: parseFloat(explicitYoyPct.toFixed(2)),
+          status: 'success',
+          errorMessage: ''
+        });
+        calculated = true;
+      }
+
+      if (!calculated) {
+        result.push({
+          indicator: ind,
+          isRatio,
+          prevVal: prevVal ?? null,
+          currentVal: currentVal ?? null,
+          changeVal: null,
+          pctChange: null,
+          status: 'failed',
+          errorMessage: 'YoY tidak dapat dihitung'
+        });
       }
     });
 
@@ -148,15 +278,21 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
 
   // Separate nominal and ratio indicators for charts
   const nominalData = useMemo(() => {
-    return yoyDataList.filter(item => !item.isRatio);
-  }, [yoyDataList]);
+    return yoyDataList
+      .filter(item => selectedIndicators.includes(item.indicator))
+      .filter(item => !item.isRatio);
+  }, [yoyDataList, selectedIndicators]);
 
   const ratioData = useMemo(() => {
-    return yoyDataList.filter(item => item.isRatio);
-  }, [yoyDataList]);
+    return yoyDataList
+      .filter(item => selectedIndicators.includes(item.indicator))
+      .filter(item => item.isRatio);
+  }, [yoyDataList, selectedIndicators]);
 
   // Comparative charts data
   const nominalComparativeData = useMemo(() => {
+    if (!sheetData || !selectedYear) return [];
+
     return nominalData.map(item => {
       const yoyText = item.status === 'failed' 
         ? 'N/A' 
@@ -170,13 +306,13 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
         yoyLabel: yoyText
       };
     });
-  }, [nominalData, prevYear, selectedYear]);
+  }, [nominalData, prevYear, selectedYear, sheetData]);
 
   const ratioComparativeData = useMemo(() => {
     return ratioData.map(item => {
-      const yoyText = item.status === 'failed' 
-        ? 'N/A' 
-        : item.changeVal !== null 
+      const yoyText = item.status === 'failed'
+        ? 'N/A'
+        : item.changeVal !== null
           ? `${item.changeVal > 0 ? '+' : ''}${item.changeVal.toFixed(2)} ppt`
           : '0.00 ppt';
       return {
@@ -206,7 +342,7 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
   }, [ratioData]);
 
   // Tooltip content helper
-  const CustomYoyTooltip = ({ active, payload, label, isRatio }: any) => {
+  const CustomYoyTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const indName = label;
       const targetItem = yoyDataList.find(d => d.indicator === indName);
@@ -214,20 +350,15 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
 
       const formatVal = (val: number | null) => {
         if (val === null) return '-';
-        return isRatio ? `${val.toLocaleString('id-ID')}%` : val.toLocaleString('id-ID');
+        return val.toLocaleString('id-ID');
       };
 
       const formatChange = (val: number | null, pct: number | null) => {
         if (targetItem.status === 'failed') return 'YoY tidak dapat dihitung';
         if (val === null || pct === null) return '-';
         
-        if (isRatio) {
-          const sign = val > 0 ? '+' : '';
-          return `${sign}${val.toFixed(2)} poin persentase (ppt)`;
-        } else {
-          const sign = pct > 0 ? '+' : '';
-          return `${sign}${pct.toFixed(2)}% (${val > 0 ? 'Naik' : val < 0 ? 'Turun' : 'Netral'})`;
-        }
+        const sign = pct > 0 ? '+' : '';
+        return `${sign}${pct.toFixed(2)}% (${val > 0 ? 'Naik' : val < 0 ? 'Turun' : 'Netral'})`;
       };
 
       return (
@@ -317,21 +448,23 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {/* Sheet Selector */}
-          <div className="flex flex-col space-y-1">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Sektor/Sheet</span>
-            <div className="relative min-w-[140px]">
-              <select
-                value={selectedSheet}
-                onChange={(e) => setSelectedSheet(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] cursor-pointer"
-              >
-                {sheetNames.map(name => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          {!hideSheetSelect && (
+            <div className="flex flex-col space-y-1">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Sektor/Sheet</span>
+              <div className="relative min-w-[140px]">
+                <select
+                  value={selectedSheet}
+                  onChange={(e) => setSelectedSheet(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] cursor-pointer"
+                >
+                  {sheetNames.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Year Target Selector */}
           <div className="flex flex-col space-y-1">
@@ -365,7 +498,7 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] cursor-pointer"
                 >
-                  {sheetData.months.map(mo => (
+                  {availableYoyMonths.map(mo => (
                     <option key={mo} value={mo}>{mo}</option>
                   ))}
                 </select>
@@ -373,6 +506,61 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
               </div>
             </div>
           )}
+
+          {/* Indicator Selector */}
+          <div className="flex flex-col space-y-1 relative">
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Pilih Indikator</span>
+            <div className="relative min-w-[170px]">
+              <button
+                type="button"
+                disabled={!sheetData}
+                onClick={() => {
+                  setIndicatorDropdownOpen(!indicatorDropdownOpen);
+                }}
+                className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 text-left flex items-center justify-between focus:outline-none focus:ring-1 focus:ring-[#C61E1E] disabled:opacity-50"
+              >
+                <span className="truncate">{getSelectedIndicatorsLabel()}</span>
+                <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+              </button>
+
+              {indicatorDropdownOpen && sheetData?.indicators && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIndicatorDropdownOpen(false)} />
+                  <div className="absolute top-full right-0 mt-1.5 bg-white border border-slate-100 rounded-xl shadow-lg z-40 max-h-[220px] overflow-y-auto p-2 space-y-1 w-[200px]">
+                    {sheetData.indicators.map((ind) => {
+                      const isSelected = selectedIndicators.includes(ind);
+                      return (
+                        <button
+                          key={ind}
+                          type="button"
+                          onClick={() => {
+                            const next = selectedIndicators.includes(ind)
+                              ? selectedIndicators.filter(item => item !== ind)
+                              : [...selectedIndicators, ind];
+                            setSelectedIndicators(next);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs rounded-lg font-semibold flex items-center justify-between ${isSelected
+                              ? 'bg-[#C61E1E]/5 text-[#C61E1E] font-bold'
+                              : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                        >
+                          <span className="flex items-center gap-2 max-w-[85%] truncate">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              readOnly
+                              className="rounded border-slate-300 text-[#C61E1E] focus:ring-[#C61E1E] w-3.5 h-3.5"
+                            />
+                            <span className="truncate" title={ind}>{ind}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -386,44 +574,46 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
         <>
           {/* Summary Metric Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {yoyDataList.map((item) => {
-              const showVal = (val: number | null) => {
-                if (val === null) return '-';
-                return item.isRatio ? `${val.toLocaleString('id-ID')}%` : val.toLocaleString('id-ID');
-              };
+            {yoyDataList
+              .filter(item => selectedIndicators.includes(item.indicator))
+              .map((item) => {
+                const showVal = (val: number | null) => {
+                  if (val === null) return '-';
+                  return item.isRatio ? `${val.toLocaleString('id-ID')}%` : val.toLocaleString('id-ID');
+                };
 
-              return (
-                <div 
-                  key={item.indicator}
-                  className="bg-white border border-slate-100 p-4.5 rounded-2xl shadow-soft flex flex-col justify-between space-y-3 hover:border-[#C61E1E]/20 transition-all group"
-                >
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate" title={item.indicator}>
-                      {item.indicator}
-                    </span>
-                    <h4 className="text-sm font-black text-slate-800 font-mono tracking-tight">
-                      {showVal(item.currentVal)}
-                    </h4>
-                    <p className="text-[9px] font-semibold text-slate-400">
-                      Tahun {prevYear}: {showVal(item.prevVal)}
-                    </p>
+                return (
+                  <div
+                    key={item.indicator}
+                    className="bg-white border border-slate-100 p-4.5 rounded-2xl shadow-soft flex flex-col justify-between space-y-3 hover:border-[#C61E1E]/20 transition-all group"
+                  >
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate" title={item.indicator}>
+                        {item.indicator}
+                      </span>
+                      <h4 className="text-sm font-black text-slate-800 font-mono tracking-tight">
+                        {showVal(item.currentVal)}
+                      </h4>
+                      <p className="text-[9px] font-semibold text-slate-400">
+                        Tahun {prevYear}: {showVal(item.prevVal)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
+                      <span className="text-[9px] font-extrabold text-slate-400 tracking-wide uppercase">YoY</span>
+                      {renderBadge(item)}
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
-                    <span className="text-[9px] font-extrabold text-slate-400 tracking-wide uppercase">YoY</span>
-                    {renderBadge(item)}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
 
           {/* Visualizations Area */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
+          <div className="w-full">
+
             {/* 1. NOMINAL COMPARISON */}
             {nominalComparativeData.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col space-y-4 w-full">
                 <div>
                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
                     Perbandingan Nominal YoY ({prevYear} vs {selectedYear})
@@ -433,115 +623,22 @@ export default function YoyAnalysis({ activeFile }: YoyAnalysisProps) {
                   </p>
                 </div>
 
-                <div className="h-[280px]">
+                <div className="h-[360px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={nominalComparativeData} margin={{ top: 25, right: 10, left: 15, bottom: 5 }}>
+                    <BarChart 
+                      data={nominalComparativeData} 
+                      margin={{ top: 25, right: 10, left: 15, bottom: 5 }}
+                      barGap={4}
+                      barCategoryGap="20%"
+                    >
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                      <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 700 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 9, fill: '#64748B' }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomYoyTooltip isRatio={false} />} />
-                      <Legend wrapperStyle={{ fontSize: 9, fontWeight: 700, paddingTop: 10 }} />
-                      <Bar dataKey={prevYear} fill="#94A3B8" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                      <Bar dataKey={selectedYear} fill="#C61E1E" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                        <LabelList dataKey="yoyLabel" position="top" style={{ fontSize: 9, fontWeight: 800, fill: '#1E293B' }} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-
-            {/* 2. RATIO COMPARISON */}
-            {ratioComparativeData.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col space-y-4">
-                <div>
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                    Perbandingan Rasio Keuangan YoY ({prevYear} vs {selectedYear})
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                    Membandingkan rasio NPL dan LDR
-                  </p>
-                </div>
-
-                <div className="h-[280px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={ratioComparativeData} margin={{ top: 25, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                      <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 9, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                      <Tooltip content={<CustomYoyTooltip isRatio={true} />} />
-                      <Legend wrapperStyle={{ fontSize: 9, fontWeight: 700, paddingTop: 10 }} />
-                      <Bar dataKey={prevYear} fill="#94A3B8" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                      <Bar dataKey={selectedYear} fill="#1E293B" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                        <LabelList dataKey="yoyLabel" position="top" style={{ fontSize: 9, fontWeight: 800, fill: '#C61E1E' }} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-
-            {/* 3. GROWTH RATE CHART (Nominal %) */}
-            {nominalGrowthData.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col space-y-4">
-                <div>
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                    Grafik Khusus "Pertumbuhan YoY" (Nominal)
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                    Persentase Pertumbuhan Nominal Keuangan
-                  </p>
-                </div>
-
-                <div className="h-[240px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={nominalGrowthData} margin={{ top: 20, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                      <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 9, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                      <Tooltip formatter={(value) => [`${value}%`, 'Pertumbuhan']} />
-                      <Bar dataKey="growth" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                        {nominalGrowthData.map((entry, index) => {
-                          const isPositive = entry.growth > 0;
-                          const isNegative = entry.growth < 0;
-                          const color = isPositive ? '#10B981' : isNegative ? '#EF4444' : '#94A3B8';
-                          return <Cell key={`cell-${index}`} fill={color} />;
-                        })}
-                        <LabelList dataKey="label" position="top" style={{ fontSize: 9, fontWeight: 800, fill: '#475569' }} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-
-            {/* 4. POINT CHANGE CHART (Ratio ppt) */}
-            {ratioGrowthData.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-5 flex flex-col space-y-4">
-                <div>
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                    Grafik Khusus "Perubahan YoY" (Rasio/Persentase)
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                    Kenaikan/Penurunan Poin Persentase (ppt)
-                  </p>
-                </div>
-
-                <div className="h-[240px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={ratioGrowthData} margin={{ top: 20, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                      <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 9, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v} ppt`} />
-                      <Tooltip formatter={(value) => [`${value} ppt`, 'Perubahan']} />
-                      <Bar dataKey="change" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                        {ratioGrowthData.map((entry, index) => {
-                          const isPositive = entry.change > 0;
-                          const isNegative = entry.change < 0;
-                          const color = isPositive ? '#10B981' : isNegative ? '#EF4444' : '#94A3B8';
-                          return <Cell key={`cell-${index}`} fill={color} />;
-                        })}
-                        <LabelList dataKey="label" position="top" style={{ fontSize: 9, fontWeight: 800, fill: '#475569' }} />
+                      <Tooltip content={<CustomYoyTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, paddingTop: 10 }} />
+                      <Bar dataKey={prevYear} fill="#94A3B8" radius={[6, 6, 0, 0]} barSize={45} maxBarSize={55} />
+                      <Bar dataKey={selectedYear} fill="#C61E1E" radius={[6, 6, 0, 0]} barSize={45} maxBarSize={55}>
+                        <LabelList dataKey="yoyLabel" position="top" style={{ fontSize: 10, fontWeight: 800, fill: '#1E293B' }} />
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>

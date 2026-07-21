@@ -21,10 +21,12 @@ export default function UploadHistory({
   // Re-export historical spreadsheet from memory
   const handleDownload = (e: React.MouseEvent, item: UploadHistoryItem) => {
     e.stopPropagation();
+    const fileData = item.fileData;
+    if (!fileData) return;
     try {
       const wb = XLSX.utils.book_new();
-      Object.keys(item.fileData.sheets).forEach(sheetName => {
-        const ws = XLSX.utils.json_to_sheet(item.fileData.sheets[sheetName].data);
+      Object.keys(fileData.sheets).forEach(sheetName => {
+        const ws = XLSX.utils.json_to_sheet(fileData.sheets[sheetName].data);
         XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 30)); // Max 30 chars
       });
       XLSX.writeFile(wb, item.name);
@@ -88,9 +90,9 @@ export default function UploadHistory({
                             Aktif
                           </span>
                         )}
-                        {isDefault && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 text-[8px] font-extrabold uppercase tracking-wide">
-                            Sampel
+                        {(item.isSample || item.id.includes('default-mock') || item.name.toLowerCase().includes('sampel') || item.name.toLowerCase().includes('sample')) && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black uppercase tracking-wider">
+                            SAMPLE
                           </span>
                         )}
                       </div>

@@ -112,41 +112,73 @@ export function validateOjkTemplate(rawRows: any[][], sheetName: string, format:
     return `Sheet "${sheetName}" tidak sesuai template: Harus memiliki setidaknya kolom Indikator (Kolom A) dan satu kolom data periode.`;
   }
   
-  // Identify valid columns first (fill forward years, check months if Format 2)
+  // Identify valid columns first (fill forward years, check months/metric headers if Format 2)
   const validColIndices: number[] = [];
   let currentYear: string | null = null;
+  const row2 = format === 'Format2' && rawRows.length > 1 ? rawRows[1] : [];
 
   for (let c = 1; c < row1.length; c++) {
     const yVal = row1[c];
-    if (yVal !== undefined && yVal !== null && String(yVal).trim() !== '') {
-      const trimmed = String(yVal).trim();
-      if (/^\d{4}$/.test(trimmed)) {
-        currentYear = trimmed;
-      } else {
-        currentYear = null; // Skip non-year headers like "Pertumbuhan yoy"
-      }
+    const yValStr = String(yVal ?? '').trim();
+    const yValLower = yValStr.toLowerCase();
+    const mVal = c < row2.length && row2[c] !== undefined && row2[c] !== null ? String(row2[c]).trim().toUpperCase() : '';
+    const mValFull = c < row2.length && row2[c] !== undefined && row2[c] !== null ? String(row2[c]).trim() : '';
+    const mValLower = mValFull.toLowerCase();
+
+    // Detect YOY/SHARE in Row 1 header itself (e.g. "Pertumbuhan yoy", "YOY")
+    const isRow1Metric = yValStr.toUpperCase() === 'YOY' || yValStr.toUpperCase() === 'SHARE' ||
+      (yValLower.includes('pertumbuhan') && (yValLower.includes('yoy') || yValLower.includes('year'))) ||
+      yValLower.includes('share') || yValLower.includes('pangsa');
+
+    if (isRow1Metric) {
+      validColIndices.push(c);
+      continue;
     }
     
-    // Check if the year is valid (4 digits)
-    if (currentYear !== null) {
+    if (yVal !== undefined && yVal !== null && yValStr !== '') {
+      if (/^\d{4}$/.test(yValStr)) {
+        currentYear = yValStr;
+      } else {
+        currentYear = null;
+      }
+    }
+
+    // Detect YOY/SHARE in Row 2 (e.g. "YOY", "SHARE", "Pertumbuhan yoy")
+    const isMValMetric = mVal === 'YOY' || mVal === 'SHARE' ||
+      (mValLower.includes('pertumbuhan') && (mValLower.includes('yoy') || mValLower.includes('year'))) ||
+      mValLower.includes('pangsa');
+    
+    // Check if valid year or metric column (e.g. YOY, SHARE)
+    if (currentYear !== null || isMValMetric) {
       validColIndices.push(c);
     }
   }
 
   if (validColIndices.length === 0) {
-    return `Tidak ditemukan kolom periode yang valid pada Sheet "${sheetName}". Untuk format ${format === 'Format2' ? 'Bertingkat' : 'Tahunan'}, pastikan Baris 1 berisi Tahun (4 digit) ${format === 'Format2' ? 'dan Baris 2 berisi Bulan/Periode' : ''}.`;
+    return `Tidak ditemukan kolom periode yang valid pada Sheet "${sheetName}". Pastikan Baris 1/2 berisi Tahun dan Bulan/Metric yang valid.`;
   }
   
-  // Validate Indicator Data Rows
+  // Validate Data Rows
   const dataStartRowIdx = format === 'Format2' ? 2 : 1;
   for (let r = dataStartRowIdx; r < rawRows.length; r++) {
     const row = rawRows[r];
-    const indicatorName = row[0];
-    if (indicatorName === undefined || indicatorName === null || String(indicatorName).trim() === '') {
-      return `Nama Indikator kosong pada Sheet "${sheetName}", Baris ${r + 1} Kolom A. Setiap baris data harus memiliki nama indikator.`;
+    let indicatorName = row[0];
+
+    // If indicator name in column A is empty, check if row has numeric data
+    const hasDataInRow = validColIndices.some(c => {
+      const cellVal = row[c];
+      return cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '' && String(cellVal).trim() !== '-';
+    });
+
+    if (!indicatorName || String(indicatorName).trim() === '') {
+      if (hasDataInRow) {
+        indicatorName = 'Total';
+      } else {
+        continue; // Skip entirely empty row
+      }
     }
     
-    // Only validate cells in valid period columns
+    // Validate cells in period columns
     for (const c of validColIndices) {
       if (c < row.length) {
         const cellVal = row[c];
@@ -218,7 +250,6 @@ export async function parseExcelFile(file: File): Promise<ActiveFile> {
 
           const row1 = rawRows[0];
           
-          // Form periods by filling forward years, keeping track of valid column indices
           const periods: string[] = [];
           const yearsSet = new Set<string>();
           const monthsSet = new Set<string>();
@@ -229,25 +260,52 @@ export async function parseExcelFile(file: File): Promise<ActiveFile> {
           if (format === 'Format2') {
             const row2 = rawRows[1];
             for (let c = 1; c < row1.length; c++) {
-              const yVal = String(row1[c]).trim();
+              const yVal = String(row1[c] ?? '').trim();
+              const yValUpper = yVal.toUpperCase();
+
+              // Check if Row 1 itself is a metric column label like "Pertumbuhan yoy", "YOY", "SHARE"
+              const isRow1YOY = yValUpper === 'YOY' || yVal.toLowerCase().includes('pertumbuhan') && (yVal.toLowerCase().includes('yoy') || yVal.toLowerCase().includes('year'));
+              const isRow1SHARE = yValUpper === 'SHARE' || (yVal.toLowerCase().includes('share') || yVal.toLowerCase().includes('pangsa'));
+
+              if (isRow1YOY || isRow1SHARE) {
+                const metricKey = isRow1YOY ? 'YOY' : 'SHARE';
+                periods.push(metricKey);
+                globalUniquePeriods.add(metricKey);
+                validColIndices.push(c);
+                // Don't update currentYear for metric columns
+                continue;
+              }
+
               if (yVal !== '') {
                 if (/^\d{4}$/.test(yVal)) {
                   currentYear = yVal;
                 } else {
-                  currentYear = ''; // Reset on non-year header (e.g. Pertumbuhan yoy)
+                  currentYear = '';
                 }
               }
               
-              if (currentYear !== '') {
-                // If row2 is shorter or cell is empty, default to empty string
-                const mVal = c < row2.length && row2[c] !== undefined && row2[c] !== null ? String(row2[c]).trim() : '';
-                
-                // If month is empty, key is just year. Otherwise, year-month.
-                const periodKey = mVal !== '' ? `${currentYear}-${mVal}` : currentYear;
-                
+              const mVal = c < row2.length && row2[c] !== undefined && row2[c] !== null ? String(row2[c]).trim() : '';
+              const mValUpper = mVal.toUpperCase();
+
+              // Check if Row 2 is a metric column label like "YOY", "SHARE", "Pertumbuhan yoy"
+              const isMValYOY = mValUpper === 'YOY' || (mVal.toLowerCase().includes('pertumbuhan') && (mVal.toLowerCase().includes('yoy') || mVal.toLowerCase().includes('year')));
+              const isMValSHARE = mValUpper === 'SHARE' || mVal.toLowerCase().includes('share') || mVal.toLowerCase().includes('pangsa');
+
+              let periodKey = '';
+              if (isMValYOY) {
+                periodKey = 'YOY';
+              } else if (isMValSHARE) {
+                periodKey = 'SHARE';
+              } else if (currentYear !== '') {
+                periodKey = mVal !== '' ? `${currentYear}-${mVal}` : currentYear;
+              } else if (mVal !== '') {
+                periodKey = mVal;
+              }
+
+              if (periodKey !== '') {
                 periods.push(periodKey);
-                yearsSet.add(currentYear);
-                if (mVal !== '') {
+                if (currentYear !== '') yearsSet.add(currentYear);
+                if (mVal !== '' && !isMValYOY && !isMValSHARE) {
                   monthsSet.add(mVal);
                 }
                 globalUniquePeriods.add(periodKey);
@@ -257,7 +315,7 @@ export async function parseExcelFile(file: File): Promise<ActiveFile> {
           } else {
             // Format 1: Tahunan only
             for (let c = 1; c < row1.length; c++) {
-              const yVal = String(row1[c]).trim();
+              const yVal = String(row1[c] ?? '').trim();
               if (yVal !== '') {
                 if (/^\d{4}$/.test(yVal)) {
                   currentYear = yVal;
@@ -284,7 +342,21 @@ export async function parseExcelFile(file: File): Promise<ActiveFile> {
           // Process Data Rows
           for (let r = dataStartRowIdx; r < rawRows.length; r++) {
             const row = rawRows[r];
-            const indicatorName = String(row[0]).trim();
+            let indicatorName = String(row[0] ?? '').trim();
+
+            const hasDataInRow = validColIndices.some(c => {
+              const cellVal = row[c];
+              return cellVal !== undefined && cellVal !== null && String(cellVal).trim() !== '' && String(cellVal).trim() !== '-';
+            });
+
+            if (!indicatorName) {
+              if (hasDataInRow) {
+                indicatorName = 'Total';
+              } else {
+                continue; // Skip empty row
+              }
+            }
+
             indicators.push(indicatorName);
             globalUniqueIndicators.add(indicatorName);
             indicatorsData[indicatorName] = {};
@@ -312,14 +384,16 @@ export async function parseExcelFile(file: File): Promise<ActiveFile> {
               const yrNumber = parseInt(periodKey.split('-')[0]) || 0;
               const moName = periodKey.includes('-') ? periodKey.split('-')[1] : null;
 
-              rawPoints.push({
-                indikator: indicatorName,
-                periode: periodKey,
-                tahun: yrNumber,
-                bulan: moName,
-                nilai: parsedVal
-              });
-              totalDataPoints++;
+              if (periodKey !== 'YOY' && periodKey !== 'SHARE') {
+                rawPoints.push({
+                  indikator: indicatorName,
+                  periode: periodKey,
+                  tahun: yrNumber,
+                  bulan: moName,
+                  nilai: parsedVal
+                });
+                totalDataPoints++;
+              }
             }
             gridData.push(gridRow);
           }
@@ -371,9 +445,9 @@ export async function parseExcelFile(file: File): Promise<ActiveFile> {
   });
 }
 
-// Generate Mock Data for OJK Jawa Barat with two different sheet formats (Bertingkat & Tahunan)
+// Generate Mock Data for OJK Jawa Barat with three template types (Bank Umum, Kredit per Jenis Penggunaan, DPK per Portofolio)
 export function generateMockFile(): ActiveFile {
-  const sheetNames = ['Bank Umum', 'BPR', 'Kinerja Tahunan'];
+  const sheetNames = ['Kredit per Jenis Penggunaan', 'Bank Umum', 'Kinerja Tahunan'];
   const sheets: { [sheetName: string]: SheetData } = {};
   let totalDataPoints = 0;
   
@@ -382,9 +456,83 @@ export function generateMockFile(): ActiveFile {
     const indicatorsData: { [ind: string]: { [per: string]: number } } = {};
     const gridData: { [key: string]: any }[] = [];
     
-    // Auto-detect format type for mock sheet
+    if (sheetName === 'Kredit per Jenis Penggunaan') {
+      const indicators = ['Modal Kerja', 'Investasi', 'Konsumsi', 'Total'];
+      const periods = ['2024-Mei', '2025-Mei', '2026-Mei', 'YOY', 'SHARE'];
+      const years = ['2024', '2025', '2026'];
+      const months = ['Mei'];
+
+      const presetData: { [ind: string]: { [per: string]: number } } = {
+        'Modal Kerja': {
+          '2024-Mei': 351393161049054,
+          '2025-Mei': 338810328055006,
+          '2026-Mei': 329740604279539,
+          'YOY': -0.0268,
+          'SHARE': 0.3052
+        },
+        'Investasi': {
+          '2024-Mei': 190762844685500,
+          '2025-Mei': 216723091364230,
+          '2026-Mei': 251790742742739,
+          'YOY': 0.1618,
+          'SHARE': 0.2330
+        },
+        'Konsumsi': {
+          '2024-Mei': 442899398544257,
+          '2025-Mei': 474957031024500,
+          '2026-Mei': 499029032369175,
+          'YOY': 0.0507,
+          'SHARE': 0.4618
+        },
+        'Total': {
+          '2024-Mei': 985055404278811,
+          '2025-Mei': 1030490450443740,
+          '2026-Mei': 1080560379391450,
+          'YOY': 0.0486,
+          'SHARE': 1.0000
+        }
+      };
+
+      indicators.forEach((ind, idx) => {
+        indicatorsData[ind] = presetData[ind];
+        const gridRow: { [key: string]: any } = {
+          indicator: ind,
+          _excelRowNumber: idx + 3,
+          ...presetData[ind]
+        };
+        gridData.push(gridRow);
+
+        ['2024-Mei', '2025-Mei', '2026-Mei'].forEach(period => {
+          const yr = parseInt(period.split('-')[0]);
+          const mo = period.split('-')[1];
+          rawPoints.push({
+            indikator: ind,
+            periode: period,
+            tahun: yr,
+            bulan: mo,
+            nilai: presetData[ind][period]
+          });
+          totalDataPoints++;
+        });
+      });
+
+      sheets[sheetName] = {
+        name: sheetName,
+        indicators,
+        years,
+        months,
+        periods,
+        rawPoints,
+        indicatorsData,
+        data: gridData,
+        columns: ['indicator', ...periods],
+        numericColumns: periods,
+        categoricalColumns: ['indicator']
+      };
+      return;
+    }
+
     const isTahunan = sheetName === 'Kinerja Tahunan';
-    
     const indicators = ['Aset', 'Dana Pihak Ketiga', 'Kredit', 'NPL', 'LDR'];
     const years = isTahunan ? ['2020', '2021', '2022', '2023', '2024', '2025', '2026'] : ['2025', '2026'];
     const months = isTahunan ? [] : ['Jan', 'Mei', 'Des'];
@@ -400,7 +548,7 @@ export function generateMockFile(): ActiveFile {
       }
     });
 
-    const mult = sheetName === 'Bank Umum' ? 1.0 : sheetName === 'BPR' ? 0.3 : 0.8;
+    const mult = sheetName === 'Bank Umum' ? 1.0 : 0.8;
 
     indicators.forEach((indicator) => {
       indicatorsData[indicator] = {};
@@ -457,11 +605,11 @@ export function generateMockFile(): ActiveFile {
   });
 
   return {
-    name: 'Data_Visualisasi_OJK_Jabar_MultiFormat.xlsx',
+    name: 'Data_Kredit_per_Jenis_Penggunaan_OJK.xlsx',
     size: 38400,
     sheetNames,
     sheets,
-    activeSheetName: 'Bank Umum',
+    activeSheetName: 'Kredit per Jenis Penggunaan',
     uploadDate: new Date().toLocaleDateString('id-ID', {
       day: '2-digit',
       month: 'short',
@@ -470,16 +618,83 @@ export function generateMockFile(): ActiveFile {
       minute: '2-digit'
     }),
     rowCount: totalDataPoints,
-    totalIndicators: 5,
-    totalPeriods: 13
+    totalIndicators: 4,
+    totalPeriods: 5,
+    isSample: true
   };
 }
 
-// Generate and trigger download of official OJK Excel Template (supports both Tahunan & Bertingkat sheets)
+// Download template khusus Kredit per Jenis Penggunaan
+export function downloadKreditJenisTemplate(): void {
+  const wb = XLSX.utils.book_new();
+  
+  const headersRow1 = ['Kredit per Jenis Penggunaan', 2024, 2025, 2026, '', ''];
+  const headersRow2 = ['', 'Mei', 'Mei', 'Mei', 'YOY', 'SHARE'];
+  const dataRow1 = ['Modal Kerja', 351393161049054, 338810328055006, 329740604279539, -0.0268, 0.3052];
+  const dataRow2 = ['Investasi', 190762844685500, 216723091364230, 251790742742739, 0.1618, 0.2330];
+  const dataRow3 = ['Konsumsi', 442899398544257, 474957031024500, 499029032369175, 0.0507, 0.4618];
+  const dataRow4 = ['Total', 985055404278811, 1030490450443740, 1080560379391450, 0.0486, 1.0000];
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    headersRow1,
+    headersRow2,
+    dataRow1,
+    dataRow2,
+    dataRow3,
+    dataRow4
+  ]);
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Kredit per Jenis Penggunaan');
+  XLSX.writeFile(wb, 'Template_Kredit_per_Jenis_Penggunaan_OJK.xlsx');
+}
+
+// Download template khusus DPK per Portofolio
+export function downloadDpkTemplate(): void {
+  const wb = XLSX.utils.book_new();
+  
+  const headersRow1 = ['DPK', 2024, 2025, 2026, '', ''];
+  const headersRow2 = ['', 'Mei', 'Mei', 'Mei', 'YOY', 'SHARE'];
+  const dataRow1 = ['Giro', 136614038441794, 149838852087387, 174830850692072, 0.1668, 0.2290];
+  const dataRow2 = ['Tabungan', 318730159773855, 332539196995268, 361901013518981, 0.0883, 0.4740];
+  const dataRow3 = ['Deposito', 239460401053625, 232504312637831, 226832053960849, -0.0244, 0.2971];
+  const dataRow4 = ['Total', 694804599269274, 714882361720486, 763563918171902, 0.0681, 1.0000];
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    headersRow1,
+    headersRow2,
+    dataRow1,
+    dataRow2,
+    dataRow3,
+    dataRow4
+  ]);
+
+  XLSX.utils.book_append_sheet(wb, ws, 'DPK per Portofolio');
+  XLSX.writeFile(wb, 'Template_DPK_per_Portofolio_OJK.xlsx');
+}
+
+// Generate and trigger download of official master OJK Excel Template
 export function downloadOjkTemplate(): void {
   const wb = XLSX.utils.book_new();
   
-  // Sheet 1: Format 2 (Tahun + Bulan)
+  // Sheet 1: Kredit per Jenis Penggunaan
+  const kjHeadersRow1 = ['Kredit per Jenis Penggunaan', 2024, 2025, 2026, '', ''];
+  const kjHeadersRow2 = ['', 'Mei', 'Mei', 'Mei', 'YOY', 'SHARE'];
+  const kjRow1 = ['Modal Kerja', 351393161049054, 338810328055006, 329740604279539, -0.0268, 0.3052];
+  const kjRow2 = ['Investasi', 190762844685500, 216723091364230, 251790742742739, 0.1618, 0.2330];
+  const kjRow3 = ['Konsumsi', 442899398544257, 474957031024500, 499029032369175, 0.0507, 0.4618];
+  const kjRow4 = ['Total', 985055404278811, 1030490450443740, 1080560379391450, 0.0486, 1.0000];
+
+  const wsKj = XLSX.utils.aoa_to_sheet([
+    kjHeadersRow1,
+    kjHeadersRow2,
+    kjRow1,
+    kjRow2,
+    kjRow3,
+    kjRow4
+  ]);
+  XLSX.utils.book_append_sheet(wb, wsKj, 'Kredit per Jenis Penggunaan');
+
+  // Sheet 2: Format Bulanan (Bertingkat)
   const headersRow1 = ['Indikator', 2025, '', '', 2026, '', ''];
   const headersRow2 = ['Periode', 'Jan', 'Mei', 'Des', 'Jan', 'Mei', 'Des'];
   const dataRow1 = ['Aset', 1020177729, 1084920400, 1120400192, 1150490100, 1205930000, 1250100900];
@@ -499,13 +714,13 @@ export function downloadOjkTemplate(): void {
   ]);
   
   ws1['!merges'] = [
-    { s: { r: 0, c: 1 }, e: { r: 0, c: 3 } }, // 2025
-    { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }  // 2026
+    { s: { r: 0, c: 1 }, e: { r: 0, c: 3 } },
+    { s: { r: 0, c: 4 }, e: { r: 0, c: 6 } }
   ];
   
   XLSX.utils.book_append_sheet(wb, ws1, 'Format Bulanan (Bertingkat)');
 
-  // Sheet 2: Format 1 (Tahunan)
+  // Sheet 3: Format 1 (Tahunan)
   const tahHeaders = ['Indikator', 2020, 2021, 2022, 2023, 2024, 2025, 2026];
   const tahAset = ['Aset', 820100900, 890400100, 930190200, 961561751, 1020177729, 1084920400, 1150490100];
   const tahDpk = ['Dana Pihak Ketiga', 750100900, 820290400, 860180900, 890280100, 950180900, 990480200, 1040300900];
@@ -524,5 +739,6 @@ export function downloadOjkTemplate(): void {
 
   XLSX.utils.book_append_sheet(wb, ws2, 'Format Tahunan');
   
-  XLSX.writeFile(wb, 'Template_Excel_OJK_Jabar.xlsx');
+  XLSX.writeFile(wb, 'Template_Excel_OJK_Jabar_Lengkap.xlsx');
 }
+

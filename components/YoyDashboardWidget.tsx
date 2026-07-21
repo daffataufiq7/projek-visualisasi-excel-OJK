@@ -33,13 +33,11 @@ export default function YoyDashboardWidget({ activeFile, filterState }: YoyDashb
     return activeFile.sheets[selectedSheet];
   }, [activeFile, selectedSheet]);
 
-  // Target years that have a previous year available in the sheet
+  // All available years in the sheet sorted ascending
   const targetYears = useMemo(() => {
     if (!sheetData) return [];
-    return sheetData.years.filter(yr => {
-      const prevYr = String(Number(yr) - 1);
-      return sheetData.years.includes(prevYr);
-    }).sort();
+    const validYears = sheetData.years.filter(yr => yr && yr !== 'All' && /^\d{4}$/.test(yr)).sort();
+    return validYears.length > 0 ? validYears : sheetData.years.filter(yr => yr && yr !== 'All').sort();
   }, [sheetData]);
 
   const [selectedYear, setSelectedYear] = useState<string>('');
@@ -57,51 +55,145 @@ export default function YoyDashboardWidget({ activeFile, filterState }: YoyDashb
     }
   }, [targetYears, filterState.year]);
 
-  const hasMonths = sheetData?.months && sheetData.months.length > 0;
+  // Previous comparison year: either selectedYear - 1, or previous year in targetYears array
+  const prevYear = useMemo(() => {
+    if (!selectedYear || targetYears.length === 0) return '';
+    const numericYear = Number(selectedYear);
+    const directPrev = String(numericYear - 1);
+    if (targetYears.includes(directPrev)) return directPrev;
+    
+    const currIdx = targetYears.indexOf(selectedYear);
+    if (currIdx > 0) return targetYears[currIdx - 1];
+    if (targetYears.length > 1) return targetYears[0];
+    return selectedYear;
+  }, [selectedYear, targetYears]);
+
+  // Available months for YoY analysis: only months that exist in BOTH selectedYear and prevYear
+  const availableYoyMonths = useMemo(() => {
+    if (!sheetData || !sheetData.months || sheetData.months.length === 0) return [];
+    if (!selectedYear) return sheetData.months;
+
+    const targetMonths = sheetData.periods
+      .filter(p => p.startsWith(`${selectedYear}-`))
+      .map(p => p.split('-')[1])
+      .filter(Boolean);
+
+    if (!prevYear || prevYear === selectedYear) {
+      return targetMonths.length > 0 ? targetMonths : sheetData.months;
+    }
+
+    const prevMonths = sheetData.periods
+      .filter(p => p.startsWith(`${prevYear}-`))
+      .map(p => p.split('-')[1])
+      .filter(Boolean);
+
+    const commonMonths = targetMonths.filter(m => prevMonths.includes(m));
+
+    if (commonMonths.length > 0) {
+      return commonMonths;
+    }
+    return targetMonths.length > 0 ? targetMonths : sheetData.months;
+  }, [sheetData, selectedYear, prevYear]);
+
+  const hasMonths = availableYoyMonths.length > 0;
   const [selectedMonth, setSelectedMonth] = useState<string>('');
 
-  // Set target month when hasMonths or filterState.month changes
+  // Preserve selected month if valid in availableYoyMonths; otherwise default to latest available month
   React.useEffect(() => {
-    if (hasMonths && sheetData.months.length > 0) {
-      if (filterState.month !== 'All' && sheetData.months.includes(filterState.month)) {
-        setSelectedMonth(filterState.month);
-      } else {
-        setSelectedMonth(sheetData.months[sheetData.months.length - 1]);
+    if (availableYoyMonths.length > 0) {
+      if (!selectedMonth || !availableYoyMonths.includes(selectedMonth)) {
+        if (filterState.month !== 'All' && availableYoyMonths.includes(filterState.month)) {
+          setSelectedMonth(filterState.month);
+        } else {
+          setSelectedMonth(availableYoyMonths[availableYoyMonths.length - 1]);
+        }
       }
     } else {
       setSelectedMonth('');
     }
-  }, [sheetData, hasMonths, filterState.month]);
+  }, [availableYoyMonths, filterState.month, selectedMonth]);
 
-  const prevYear = useMemo(() => {
-    if (!selectedYear) return '';
-    return String(Number(selectedYear) - 1);
-  }, [selectedYear]);
+
 
   const yoyCalculations = useMemo(() => {
-    if (!sheetData || !selectedYear) {
+    if (!sheetData) {
       return { available: false, chartData: [] };
     }
 
-    const currentPeriod = hasMonths ? `${selectedYear}-${selectedMonth}` : selectedYear;
-    const prevPeriod = hasMonths ? `${prevYear}-${selectedMonth}` : prevYear;
+    // Non-YOY data periods (exclude meta-columns)
+    const dataPeriods = sheetData.periods.filter(p => p !== 'YOY' && p !== 'SHARE');
+
+    const currentPeriod = hasMonths && selectedMonth && selectedYear
+      ? `${selectedYear}-${selectedMonth}`
+      : selectedYear || '';
+    const prevPeriod = hasMonths && selectedMonth && prevYear
+      ? `${prevYear}-${selectedMonth}`
+      : prevYear || '';
 
     const nominalInds = sheetData.indicators.filter(ind => !/npl|ldr|%|rasio|ratio|growth|pertumbuhan/i.test(ind));
 
     const chartData = nominalInds.map((ind) => {
-      const currentVal = sheetData.indicatorsData[ind]?.[currentPeriod] ?? 0;
-      const prevVal = sheetData.indicatorsData[ind]?.[prevPeriod] ?? 0;
+      // Current val: prefer selected period, fallback to last data period
+      let currentVal: number = 0;
+      if (currentPeriod && sheetData.indicatorsData[ind]?.[currentPeriod] !== undefined) {
+        currentVal = sheetData.indicatorsData[ind][currentPeriod];
+      } else if (dataPeriods.length > 0) {
+        currentVal = sheetData.indicatorsData[ind]?.[dataPeriods[dataPeriods.length - 1]] ?? 0;
+      }
+
+      // Prev val: prefer selected prev period, fallback to first data period
+      let prevVal: number = 0;
+      if (prevPeriod && sheetData.indicatorsData[ind]?.[prevPeriod] !== undefined) {
+        prevVal = sheetData.indicatorsData[ind][prevPeriod];
+      } else if (dataPeriods.length > 1) {
+        prevVal = sheetData.indicatorsData[ind]?.[dataPeriods[0]] ?? 0;
+      }
 
       let growth = 0;
       let status: 'success' | 'failed' = 'success';
       let label = '0.00%';
+      let calculated = false;
 
-      if (prevVal === 0) {
-        status = 'failed';
-        label = 'N/A';
-      } else {
+      // Step 1: Always read explicit YOY column first
+      const explicitYoyRaw = sheetData.indicatorsData[ind]?.['YOY'];
+      let explicitYoyPct: number | null = null;
+      if (explicitYoyRaw !== undefined && explicitYoyRaw !== null) {
+        const rawNum = typeof explicitYoyRaw === 'number'
+          ? explicitYoyRaw
+          : parseFloat(String(explicitYoyRaw).replace('%', '').trim());
+        if (!isNaN(rawNum) && rawNum !== 0) {
+          explicitYoyPct = Math.abs(rawNum) <= 1.0 ? rawNum * 100 : rawNum;
+        }
+      }
+      // Fallback explicit YOY from grid row
+      if (explicitYoyPct === null) {
+        const gridRow = sheetData.data.find(d => d.indicator === ind || d.indicator?.toLowerCase() === ind.toLowerCase());
+        const gridYoy = gridRow?.['YOY'] ?? gridRow?.['yoy'] ?? gridRow?.['YoY'];
+        if (gridYoy !== undefined && gridYoy !== null && gridYoy !== '') {
+          const rawNum = typeof gridYoy === 'number' ? gridYoy : parseFloat(String(gridYoy).replace('%', '').trim());
+          if (!isNaN(rawNum) && rawNum !== 0) {
+            explicitYoyPct = Math.abs(rawNum) <= 1.5 ? rawNum * 100 : rawNum;
+          }
+        }
+      }
+
+      // Step 2: Calculate from period data if both periods differ and prevVal is non-zero
+      if (prevVal !== 0 && currentPeriod !== prevPeriod && currentPeriod !== '' && prevPeriod !== '') {
         growth = ((currentVal - prevVal) / prevVal) * 100;
         label = `${growth > 0 ? '+' : ''}${growth.toFixed(2)}%`;
+        calculated = true;
+      }
+
+      // Step 3: Use explicit YOY as fallback
+      if (!calculated && explicitYoyPct !== null) {
+        growth = explicitYoyPct;
+        label = `${growth > 0 ? '+' : ''}${growth.toFixed(2)}%`;
+        calculated = true;
+      }
+
+      if (!calculated) {
+        status = 'failed';
+        label = 'N/A';
       }
 
       return {
@@ -182,7 +274,7 @@ export default function YoyDashboardWidget({ activeFile, filterState }: YoyDashb
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1.5 text-[10px] font-bold text-slate-600 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] cursor-pointer"
               >
-                {sheetData.months.map(mo => (
+                {availableYoyMonths.map(mo => (
                   <option key={mo} value={mo}>{mo}</option>
                 ))}
               </select>
@@ -200,11 +292,11 @@ export default function YoyDashboardWidget({ activeFile, filterState }: YoyDashb
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="h-[200px]">
+          <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={yoyCalculations.chartData} margin={{ top: 20, right: 10, left: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748B', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 700 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 9, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
                 <Tooltip 
                   formatter={(value, name, props) => {
@@ -217,14 +309,14 @@ export default function YoyDashboardWidget({ activeFile, filterState }: YoyDashb
                   }}
                   contentStyle={{ fontSize: 10, borderRadius: 8 }}
                 />
-                <Bar dataKey="growth" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                <Bar dataKey="growth" radius={[6, 6, 0, 0]} barSize={42} maxBarSize={50}>
                   {yoyCalculations.chartData.map((entry, index) => {
                     const isPositive = entry.growth > 0;
                     const isNegative = entry.growth < 0;
                     const color = isPositive ? '#10B981' : isNegative ? '#EF4444' : '#94A3B8';
                     return <Cell key={`cell-${index}`} fill={color} />;
                   })}
-                  <LabelList dataKey="label" position="top" style={{ fontSize: 9, fontWeight: 800, fill: '#475569' }} />
+                  <LabelList dataKey="label" position="top" style={{ fontSize: 10, fontWeight: 800, fill: '#475569' }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

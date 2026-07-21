@@ -14,7 +14,10 @@ import {
   FileCheck,
   User,
   ChevronDown,
-  TrendingUp
+  TrendingUp,
+  Building2,
+  CreditCard,
+  Wallet
 } from 'lucide-react';
 import Logo from './Logo';
 import { ActiveFile } from '../types/dashboard';
@@ -40,12 +43,34 @@ export default function Layout({
 
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
-    { id: 'yoy', name: 'Analisis YoY', icon: TrendingUp },
-    { id: 'upload', name: 'Upload Excel', icon: UploadCloud },
+    { 
+      id: 'bank_umum', 
+      name: 'Perbankan Jawa Barat', 
+      icon: Building2,
+      subItems: [
+        { id: 'bank_umum_upload', name: 'Upload Excel', icon: UploadCloud },
+        { id: 'bank_umum_history', name: 'Riwayat Upload', icon: History }
+      ]
+    },
+    { 
+      id: 'kredit_jenis', 
+      name: 'Kredit per Jenis Penggunaan', 
+      icon: CreditCard,
+      subItems: [
+        { id: 'kredit_jenis_upload', name: 'Upload Excel', icon: UploadCloud },
+        { id: 'kredit_jenis_history', name: 'Riwayat Upload', icon: History }
+      ]
+    },
+    { 
+      id: 'dpk_portofolio', 
+      name: 'DPK per Portofolio', 
+      icon: Wallet,
+      subItems: [
+        { id: 'dpk_portofolio_upload', name: 'Upload Excel', icon: UploadCloud },
+        { id: 'dpk_portofolio_history', name: 'Riwayat Upload', icon: History }
+      ]
+    },
     { id: 'template', name: 'Download Template', icon: FileSpreadsheet },
-    { id: 'history', name: 'Riwayat Upload', icon: History },
-    { id: 'visualisasi', name: 'Visualisasi', icon: LineChart },
-    { id: 'laporan', name: 'Laporan', icon: FileCheck },
     { id: 'pengaturan', name: 'Pengaturan', icon: Settings },
     { id: 'tentang', name: 'Tentang', icon: Info },
   ];
@@ -54,7 +79,7 @@ export default function Layout({
     <div className="min-h-screen flex bg-slate-50 text-slate-800 antialiased font-sans">
       {/* SIDEBAR FOR DESKTOP */}
       <aside 
-        className={`hidden md:flex flex-col bg-white border-r border-slate-100 transition-all duration-300 relative z-20 ${
+        className={`hidden md:flex flex-col bg-white border-r border-slate-100 transition-all duration-300 sticky top-0 h-screen z-20 shrink-0 ${
           sidebarCollapsed ? 'w-20' : 'w-64'
         }`}
       >
@@ -73,24 +98,54 @@ export default function Layout({
 
         {/* Navigation Items */}
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-          {menuItems.map((item) => {
+          {menuItems.map((item: any) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            const hasSubItems = item.subItems && item.subItems.length > 0;
+            const isParentActive = isActive || (hasSubItems && item.subItems.some((sub: any) => activeTab === sub.id));
 
             return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                  isActive 
-                    ? 'bg-[#C61E1E] text-white shadow-md shadow-red-900/10 font-semibold' 
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-[#C61E1E]'
-                } ${sidebarCollapsed ? 'justify-center' : ''}`}
-                title={sidebarCollapsed ? item.name : undefined}
-              >
-                <Icon size={20} className={isActive ? 'text-white' : ''} />
-                {!sidebarCollapsed && <span className="text-sm">{item.name}</span>}
-              </button>
+              <div key={item.id} className="space-y-1">
+                <button
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                    isActive 
+                      ? 'bg-[#C61E1E] text-white shadow-md shadow-red-900/10 font-semibold' 
+                      : isParentActive
+                        ? 'bg-slate-50 text-[#C61E1E] font-semibold'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-[#C61E1E]'
+                  } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                  title={sidebarCollapsed ? item.name : undefined}
+                >
+                  <Icon size={20} className={isActive ? 'text-white' : isParentActive ? 'text-[#C61E1E]' : ''} />
+                  {!sidebarCollapsed && <span className="text-sm">{item.name}</span>}
+                </button>
+                
+                {/* Render sub-items if parent is expanded (sidebar not collapsed) */}
+                {hasSubItems && !sidebarCollapsed && (
+                  <div className="pl-6 space-y-1 mt-1 border-l-2 border-slate-100 ml-6">
+                    {item.subItems.map((sub: any) => {
+                      const SubIcon = sub.icon;
+                      const isSubActive = activeTab === sub.id;
+                      
+                      return (
+                        <button
+                          key={sub.id}
+                          onClick={() => setActiveTab(sub.id)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 ${
+                            isSubActive
+                              ? 'bg-[#C61E1E]/5 text-[#C61E1E] font-bold border-l-2 border-[#C61E1E] pl-2'
+                              : 'text-slate-500 hover:bg-slate-50 hover:text-[#C61E1E]'
+                          }`}
+                        >
+                          <SubIcon size={16} />
+                          <span className="text-xs">{sub.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -143,26 +198,60 @@ export default function Layout({
               </button>
             </div>
             <nav className="flex-1 space-y-1">
-              {menuItems.map((item) => {
+              {menuItems.map((item: any) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
+                const hasSubItems = item.subItems && item.subItems.length > 0;
+                const isParentActive = isActive || (hasSubItems && item.subItems.some((sub: any) => activeTab === sub.id));
 
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
-                      isActive 
-                        ? 'bg-[#C61E1E] text-white font-semibold' 
-                        : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Icon size={20} />
-                    <span className="text-sm">{item.name}</span>
-                  </button>
+                  <div key={item.id} className="space-y-1">
+                    <button
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        if (!hasSubItems) {
+                          setMobileMenuOpen(false);
+                        }
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                        isActive 
+                          ? 'bg-[#C61E1E] text-white font-semibold' 
+                          : isParentActive
+                            ? 'bg-slate-50 text-[#C61E1E] font-semibold'
+                            : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Icon size={20} />
+                      <span className="text-sm">{item.name}</span>
+                    </button>
+
+                    {hasSubItems && (
+                      <div className="pl-6 space-y-1 mt-1 border-l-2 border-slate-100 ml-6">
+                        {item.subItems.map((sub: any) => {
+                          const SubIcon = sub.icon;
+                          const isSubActive = activeTab === sub.id;
+
+                          return (
+                            <button
+                              key={sub.id}
+                              onClick={() => {
+                                setActiveTab(sub.id);
+                                setMobileMenuOpen(false);
+                              }}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 ${
+                                isSubActive
+                                  ? 'bg-[#C61E1E]/5 text-[#C61E1E] font-bold border-l-2 border-[#C61E1E] pl-2'
+                                  : 'text-slate-500 hover:bg-slate-50 hover:text-[#C61E1E]'
+                              }`}
+                            >
+                              <SubIcon size={16} />
+                              <span className="text-xs">{sub.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>
@@ -203,6 +292,11 @@ export default function Layout({
                   <p className="text-xs font-bold truncate max-w-[150px] md:max-w-[200px] text-slate-800">
                     {activeFile.name}
                   </p>
+                  {(activeFile.isSample || activeFile.name.toLowerCase().includes('sampel') || activeFile.name.toLowerCase().includes('sample')) && (
+                    <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                      FILE SAMPLE
+                    </span>
+                  )}
                   <ChevronDown size={12} className="text-slate-400" />
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
