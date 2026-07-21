@@ -1,47 +1,72 @@
-# FINSIGHT 📊 - Financial Data Visualization Dashboard
+# 🏛️ FINSIGHT - Visualisasi Data Perbankan OJK Jawa Barat
 
-**FINSIGHT** adalah aplikasi dashboard analisis dan visualisasi data keuangan terintegrasi yang dirancang untuk kebutuhan **Otoritas Jasa Keuangan (OJK) Kantor Regional Jawa Barat**. Aplikasi ini memungkinkan pengguna untuk secara otomatis memproses, menyaring, menganalisis, dan memvisualisasikan data laporan keuangan multi-sektor langsung dari berkas Excel (.xlsx).
+<div align="center">
 
-![FINSIGHT Dashboard Screenshot](public/screenshot.png)
+![FINSIGHT Header](public/screenshot.png)
 
----
+[![Next.js](https://img.shields.io/badge/Next.js-14.2-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
+[![License](https://img.shields.io/badge/License-OJK_Internal-C61E1E?style=for-the-badge)](#)
 
-## ✨ Fitur Utama
+**Platform Visualisasi & Analisis Data Laporan Keuangan Perbankan Terintegrasi**  
+*Dirancang Khusus untuk Otoritas Jasa Keuangan (OJK) Kantor Regional Jawa Barat*
 
-- **🚀 Parser Excel Otomatis**: Unggah file Excel (.xlsx) dengan struktur multi-sheet (seperti Bank Umum, BPR, dll) dan sistem akan otomatis memetakan lembar data, kolom tahun, serta indikator keuangan terkait.
-- **📈 Visualisasi Interaktif & Dinamis**:
-  - Pilihan tipe grafik yang beragam: *Line Chart* (Tren), *Bar Chart* (Perbandingan), *Area Chart* (Akumulasi), *Radar Chart* (Komparasi Indikator), dan *Combination Chart*.
-  - Kemampuan ekspor grafik langsung ke format PNG atau SVG dengan satu klik.
-- **🔄 Analisis Year-over-Year (YoY)**:
-  - Panel analisis pertumbuhan YoY nominal dan persentase untuk indikator-indikator kunci seperti Aset, DPK (Dana Pihak Ketiga), Kredit, NPL (Non-Performing Loan), dan LDR (Loan to Deposit Ratio).
-- **📋 Riwayat Unggahan Berkas (Upload History)**:
-  - Menyimpan data berkas yang sebelumnya diunggah secara lokal untuk memudahkan akses cepat tanpa perlu mengunggah ulang setiap kali aplikasi dibuka.
-- **📥 Download Template Excel**:
-  - Menyediakan template Excel standar yang siap diunduh untuk memastikan kompatibilitas format data saat diunggah ke sistem.
-- **🎨 Premium UI/UX & Responsive Design**:
-  - Menggunakan kombinasi warna profesional khas OJK dengan transisi animasi halus menggunakan Framer Motion.
-  - Tampilan yang sepenuhnya responsif dan mendukung navigasi sidebar yang dapat dicollape.
+</div>
 
 ---
 
-## 🛠️ Tech Stack & Dependensi
+## 🌟 Tentang FINSIGHT
 
-- **Core Framework**: [Next.js 14](https://nextjs.org/) (React 18) & TypeScript
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) & Vanilla CSS (Desain Modern & Konsisten)
-- **Visualisasi/Chart**: [Recharts](https://recharts.org/) (Visualisasi data finansial real-time)
-- **Utility / Parsing**:
-  - [xlsx (SheetJS)](https://sheetjs.com/) - Parsing data Excel di sisi klien (client-side) secara aman.
-  - [Framer Motion](https://www.framer.com/motion/) - Animasi transisi halaman & komponen.
-  - [Lucide React](https://lucide.dev/) - Kumpulan ikon modern.
+**FINSIGHT** (Financial Data Visualization & Analytics Insight) adalah platform web cerdas dan modern yang dikembangkan untuk memfasilitasi analisis kinerja keuangan perbankan regional di Jawa Barat. Aplikasi ini secara intuitif memproses dokumen Excel (.xlsx) bertingkat (multi-header & multi-sheet) secara instan (*client-side*), menyajikan grafik interaktif, analisis pertumbuhan Year-over-Year (YoY), pangsa pasar (*market share*), serta tabel pratinjau data riil secara akurat.
 
 ---
 
-## 🚀 Memulai (Quick Start)
+## ✨ Fitur Unggulan
 
-Ikuti langkah-langkah di bawah ini untuk menjalankan proyek ini di lingkungan lokal Anda:
+### 📊 1. Analisis Multi-Sektor Perbankan
+- **Perbankan Jawa Barat**: Visualisasi komprehensif tren Aset, Dana Pihak Ketiga (DPK), Kredit, NPL (Non-Performing Loan), dan LDR (Loan to Deposit Ratio).
+- **Kredit per Jenis Penggunaan**: Analisis mendalam penyaluran kredit untuk Modal Kerja, Investasi, dan Konsumsi.
+- **DPK per Portofolio**: Visualisasi komposisi pangsa pasar Giro, Tabungan, dan Deposito.
 
-### Prerequisites
-Pastikan Anda sudah menginstal **Node.js** (versi LTS direkomendasikan) dan npm/yarn di komputer Anda.
+### 🔄 2. Analisis Year-over-Year (YoY) Cerdas & Presisi
+- **Auto-Matching Irisan Bulan**: Menyaring dan membandingkan hanya bulan-bulan yang tersedia pada kedua tahun pembanding secara otomatis.
+- **Preservasi State**: Pilihan bulan dan indikator pengguna tidak akan ter-reset saat melakukan navigasi, *scroll*, atau *re-render*.
+- **Metrik Ganda**: Menghitung persen pertumbuhan nominal (`%`) serta perubahan absolut rasio perbankan dalam poin persentase (`ppt`).
+
+### 🖼️ 3. Ekspor Grafik Vektor (SVG & PNG)
+- Ekspor visualisasi grafik langsung ke format gambar **PNG HD** atau vektor **SVG** dengan satu klik.
+- Otomatis menyertakan legenda warna dan label angka yang rapi pada hasil ekspor.
+
+### 📑 4. Preview Data Table Interaktif
+- **Format Nominal Riil**: Menampilkan persentase rasio perbankan (seperti LDR 130%, NPL 2,15%) secara tepat tanpa kesalahan skala desimal.
+- **Fitur Lengkap**: Pencarian global cepat, pencarian kolom (*column visibility toggle*), pengurutan (*sorting*), serta ekspor data ke **Excel (.xlsx)** atau **CSV**.
+
+### ⚡ 5. Sync Real-Time Multi-User (Ngrok & Localhost)
+- Dilengkapi dengan **API Endpoints Server-side** (`/api/data`) & auto-polling sync.
+- Pengunggahan file di localhost otomatis disinkronkan secara real-time ke pengguna yang mengakses melalui tunnel Ngrok.
+
+---
+
+## 🛠️ Arsitektur & Teknologi
+
+| Komponen | Teknologi | Keterangan |
+| :--- | :--- | :--- |
+| **Framework Utama** | Next.js 14 (Pages Router) | SSR/SSG & API Routes bawaan |
+| **Bahasa Pemrograman** | TypeScript | Type safety ketat untuk data finansial |
+| **Tampilan UI/UX** | Tailwind CSS & Framer Motion | Desain elegan khas OJK dengan animasi halus |
+| **Visualisasi Grafis** | Recharts & HTML5 Canvas | Grafik batang, garis, tumpuk, dan donut interaktif |
+| **Parser Excel** | SheetJS (XLSX) | Parsing client-side cepat tanpa dependensi server berat |
+| **Icon Set** | Lucide React | Ikon finansial & navigasi modern |
+
+---
+
+## 🚀 Panduan Memulai (Quick Start)
+
+### 📋 Prasyarat
+- Node.js versi 18.x atau yang lebih baru
+- npm / yarn / pnpm
 
 ### 1. Clone Repositori
 ```bash
@@ -50,20 +75,17 @@ cd projek-visualisasi-excel-OJK
 ```
 
 ### 2. Instal Dependensi
-Gunakan npm untuk menginstal semua pustaka pendukung:
 ```bash
 npm install
 ```
 
-### 3. Jalankan Server Pengembangan
-Jalankan aplikasi dalam mode development:
+### 3. Jalankan Mode Development
 ```bash
 npm run dev
 ```
-Setelah berhasil, buka browser Anda di [http://localhost:3000](http://localhost:3000).
+Buka [http://localhost:3000](http://localhost:3000) di browser Anda.
 
 ### 4. Build untuk Produksi
-Untuk melakukan build produksi aplikasi:
 ```bash
 npm run build
 npm run start
@@ -71,35 +93,43 @@ npm run start
 
 ---
 
-## 📁 Struktur Proyek
+## 📁 Struktur Berkas Proyek
 
 ```text
-├── components/          # Komponen UI modular (Visualisasi, Upload, YoY, dll)
-├── hooks/               # Custom hooks React untuk manajemen state dashboard
-├── pages/               # Halaman utama Next.js (index.tsx)
-├── public/              # Aset statis (gambar, template file Excel)
-├── services/            # Logika parsing Excel & kalkulasi finansial
-├── styles/              # Global CSS & konfigurasi Tailwind
-├── types/               # Definisi tipe TypeScript untuk data dashboard
-├── next.config.js       # Konfigurasi Next.js
-└── tailwind.config.js   # Konfigurasi utility Tailwind CSS
+projek-visualisasi-excel-OJK/
+├── components/            # Komponen UI Modular
+│   ├── OverviewDashboard.tsx  # Dashboard Utama Ringkasan Sektor
+│   ├── VisualizationArea.tsx  # Area Grafik Perbankan Jawa Barat & Ekspor SVG/PNG
+│   ├── KreditJenisView.tsx    # Panel Analisis Kredit per Jenis Penggunaan
+│   ├── DpkView.tsx            # Panel Analisis DPK per Portofolio
+│   ├── YoyAnalysis.tsx        # Panel Kalkulasi & Grafik YoY
+│   ├── DataTable.tsx          # Preview Table Interaktif & Ekspor Data
+│   ├── FilterArea.tsx         # Toolbar Filter Rentang Tahun & Bulan
+│   └── Layout.tsx             # Sidebar Navigasi & Header Template
+├── hooks/                 # Custom React Hooks (State Management Dashboard)
+├── pages/                 # Halaman Router Next.js & API Endpoints (/api/data)
+├── services/              # Parser Template Excel OJK & Kalkulasi Finansial
+├── styles/                # Global Stylesheet & Custom Tailwind Theme
+└── types/                 # Type Definitions TypeScript
 ```
 
 ---
 
-## 📊 Format Template Excel
-Agar visualisasi berjalan dengan lancar, pastikan berkas Excel yang Anda unggah memiliki struktur kolom berikut:
-- **Tahun** (misal: 2018, 2019, dst.)
-- **Bulan / Periode** (jika ada)
-- Kolom Indikator Keuangan utama:
-  - **Aset** (Nominal)
-  - **DPK** (Dana Pihak Ketiga)
-  - **Kredit** (Nominal)
-  - **NPL** (Nominal atau %, misal: 2.5 atau 0.025)
-  - **LDR** (Nominal atau %, misal: 80.5 atau 0.805)
+## 📝 Format Template Excel
 
-*Catatan: Anda dapat mengunduh format template standar langsung melalui menu **Download Template** di dalam aplikasi.*
+Aplikasi mendukung 3 template Excel standar OJK:
+1. **Perbankan Jawa Barat**: Multi-header 2 tingkat untuk Aset, DPK, Kredit, NPL, dan LDR.
+2. **Kredit per Jenis Penggunaan**: Penyaluran Kredit Modal Kerja, Investasi, dan Konsumsi.
+3. **DPK per Portofolio**: Penghimpunan Dana Giro, Tabungan, dan Deposito.
+
+> [!TIP]
+> Anda dapat langsung mengunduh template resmi (.xlsx) melalui menu **Download Template** pada sidebar aplikasi.
 
 ---
 
-© 2026 Otoritas Jasa Keuangan (OJK) Kantor Regional Jawa Barat.
+<div align="center">
+
+© 2026 **Otoritas Jasa Keuangan (OJK)** — Kantor Regional 2 Jawa Barat.  
+*FINSIGHT Financial Analytics Platform*
+
+</div>
