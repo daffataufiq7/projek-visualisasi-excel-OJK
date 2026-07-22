@@ -2,7 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
 
-const DATA_FILE_PATH = path.join(process.cwd(), '.data_cache.json');
+// Use /tmp directory on Vercel / serverless environment for writable persistence
+const DATA_FILE_PATH = process.env.VERCEL || process.env.NODE_ENV === 'production'
+  ? path.join('/tmp', '.data_cache.json')
+  : path.join(process.cwd(), '.data_cache.json');
 
 // In-memory & Persistent Server State for Local & Ngrok Synchronization
 let serverState: {

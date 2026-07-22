@@ -3,6 +3,7 @@ import { ActiveFile, FilterState, UploadHistoryItem } from '../types/dashboard';
 import { parseExcelFile, generateMockFile } from '../services/excelService';
 
 const LOCAL_STORAGE_HISTORY_KEY = 'finsight_upload_history';
+const LOCAL_STORAGE_ACTIVE_IDS_KEY = 'finsight_active_file_ids';
 
 export function useDashboardState() {
   const [activeFileIds, setActiveFileIds] = useState<{ [category: string]: string }>({
@@ -105,7 +106,8 @@ export function useDashboardState() {
     return [initialHistoryBankUmum, initialHistoryKredit, initialHistoryDpk];
   }, []);
 
-  // Sync with Server API (/api/data) to align Localhost & Ngrok users in real-time
+  // Sync with Server API (/api/data) to align Localhost & Ngrok users in real-time,
+  // while preserving local user uploads on Vercel/production!
   const fetchServerState = useCallback(async () => {
     try {
       const res = await fetch('/api/data');
@@ -114,19 +116,48 @@ export function useDashboardState() {
         const serverHistory = data.history || [];
         const serverActiveFileIds = data.activeFileIds || {};
 
+        // Read local user uploads from localStorage
+        const storedLocalHistoryRaw = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
+        let localUserUploads: UploadHistoryItem[] = [];
+        if (storedLocalHistoryRaw) {
+          try {
+            const parsed = JSON.parse(storedLocalHistoryRaw) as UploadHistoryItem[];
+            localUserUploads = parsed.filter(
+              h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
+            );
+          } catch (e) {
+            localUserUploads = [];
+          }
+        }
+
         const cleanedServerHistory = serverHistory.filter(
           (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
         );
 
-        const combinedHistory = [...defaultMockItems, ...cleanedServerHistory];
+        // Merge local user uploads with server history (local uploads take precedence)
+        const mergedUserHistoryMap = new Map<string, UploadHistoryItem>();
+        [...cleanedServerHistory, ...localUserUploads].forEach(item => {
+          if (item && item.id) {
+            mergedUserHistoryMap.set(item.id, item);
+          }
+        });
+        const mergedUserUploads = Array.from(mergedUserHistoryMap.values());
 
+        const combinedHistory = [...defaultMockItems, ...mergedUserUploads];
         setHistory(combinedHistory);
-        if (serverActiveFileIds && Object.keys(serverActiveFileIds).length > 0) {
-          setActiveFileIds(prev => ({
-            ...prev,
-            ...serverActiveFileIds
-          }));
+
+        // Restore active IDs from localStorage if available
+        const storedActiveIdsRaw = localStorage.getItem(LOCAL_STORAGE_ACTIVE_IDS_KEY);
+        let localActiveIds = {};
+        if (storedActiveIdsRaw) {
+          try { localActiveIds = JSON.parse(storedActiveIdsRaw); } catch(e){}
         }
+
+        setActiveFileIds(prev => ({
+          ...prev,
+          ...serverActiveFileIds,
+          ...localActiveIds
+        }));
 
         localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(combinedHistory));
       }
@@ -158,6 +189,20 @@ export function useDashboardState() {
       },
     });
 
+    // Try reading active file IDs from localStorage first
+    const storedActiveIds = localStorage.getItem(LOCAL_STORAGE_ACTIVE_IDS_KEY);
+    if (storedActiveIds) {
+      try {
+        const parsed = JSON.parse(storedActiveIds);
+        if (parsed && typeof parsed === 'object') {
+          setActiveFileIds(prev => ({
+            ...prev,
+            ...parsed
+          }));
+        }
+      } catch (e) {}
+    }
+
     // Try reading localStorage first for immediate render
     const storedHistory = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
     if (storedHistory) {
@@ -177,7 +222,7 @@ export function useDashboardState() {
     // Sync with Server API immediately
     fetchServerState();
 
-    // Set up auto-sync polling every 3 seconds for seamless Ngrok <-> Localhost sync
+    // Set up auto-sync polling every 3 seconds
     const syncInterval = setInterval(() => {
       fetchServerState();
     }, 3000);
@@ -270,6 +315,7 @@ export function useDashboardState() {
           [redirectTab]: newId,
         };
         setActiveFileIds(updatedActiveIds);
+        localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(updatedActiveIds));
 
         // Sync uploaded data to Next.js server so Ngrok users see it instantly!
         try {
@@ -376,10 +422,12 @@ export function useDashboardState() {
 
     if (activeFileIds[category] === id) {
       const defaultId = category === 'kredit_jenis' ? 'default-mock-kredit' : category === 'dpk_portofolio' ? 'default-mock-dpk' : 'default-mock-bank';
-      setActiveFileIds(prev => ({
-        ...prev,
+      const newActive = {
+        ...activeFileIds,
         [category]: defaultId
-      }));
+      };
+      setActiveFileIds(newActive);
+      localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
 
       const mockItem = updatedHistory.find(h => h.id === defaultId);
       if (mockItem && mockItem.fileData) {
@@ -409,10 +457,12 @@ export function useDashboardState() {
       const file = item.fileData;
       const sheet = file.sheetNames[0];
 
-      setActiveFileIds(prev => ({
-        ...prev,
+      const newActive = {
+        ...activeFileIds,
         [redirectTab]: id
-      }));
+      };
+      setActiveFileIds(newActive);
+      localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
 
       try {
         await fetch('/api/data', {
