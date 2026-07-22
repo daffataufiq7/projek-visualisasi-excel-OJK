@@ -731,59 +731,6 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
         </div>
 
       </div>
-
-      {/* CROSS-SECTOR EXECUTIVE DECISION SUMMARY MATRIX */}
-      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-soft space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-50 pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Layers size={16} className="text-[#C61E1E]" />
-              <span>Matriks Konsolidasi Hasil Utama 3 Sektor Perbankan</span>
-            </h3>
-            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-              Rangkuman eksekutif hasil visualisasi utama untuk pengambilan keputusan strategis
-            </p>
-          </div>
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-            Integrasi 100% Presisi
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Summary Column 1 */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold text-slate-700 uppercase">Perbankan Jawa Barat</span>
-              <span className="text-[10px] font-bold bg-red-100 text-[#C61E1E] px-2 py-0.5 rounded-md">Tren Stabil</span>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              Pertumbuhan Aset mencapai <strong className="text-slate-900 font-mono">Rp 1.205,93 T</strong> didukung penghimpunan DPK yang solid dan risiko NPL yang berada di level sangat sehat (<strong className="text-emerald-600 font-mono">1,95%</strong>).
-            </p>
-          </div>
-
-          {/* Summary Column 2 */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold text-slate-700 uppercase">Kredit per Jenis</span>
-              <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md">Ekspansi Produktif</span>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              Kredit Investasi mencatatkan lonjakan pertumbuhan tertinggi sebesar <strong className="text-emerald-600 font-mono">+16,18% YoY</strong>, menunjukkan peningkatan keberanian dorongan modal usaha di Jawa Barat.
-            </p>
-          </div>
-
-          {/* Summary Column 3 */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-extrabold text-slate-700 uppercase">DPK per Portofolio</span>
-              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">Likuiditas Tinggi</span>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              Tabungan mendominasi porsi DPK sebesar <strong className="text-emerald-600 font-mono">47,40%</strong> (*Rp 361,90 T*), disusul oleh kenaikan signifikan Giro sebesar <strong className="text-emerald-600 font-mono">+16,68% YoY</strong>.
-            </p>
-          </div>
-        </div>
-      </div>
     </motion.div>
   );
 }
