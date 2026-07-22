@@ -50,6 +50,57 @@ const KREDIT_COLORS: { [key: string]: string } = {
   'Konsumsi': '#EC4899'
 };
 
+// Helper to find row value safely for a given target indicator substring and period
+const getIndicatorValue = (sheet: any, targetSubstrings: string[], periodKey: string): number => {
+  if (!sheet) return 0;
+
+  // First try matching in sheet.indicatorsData by key
+  const matchedKey = Object.keys(sheet.indicatorsData || {}).find(k =>
+    targetSubstrings.some(sub => k.toLowerCase().includes(sub.toLowerCase()))
+  );
+
+  if (matchedKey && sheet.indicatorsData[matchedKey]?.[periodKey] !== undefined) {
+    return sheet.indicatorsData[matchedKey][periodKey];
+  }
+
+  // Fallback to searching in sheet.data rows
+  const matchedRow = sheet.data?.find((d: any) => {
+    const indName = String(d.indicator || '').toLowerCase();
+    return targetSubstrings.some(sub => indName.includes(sub.toLowerCase()));
+  });
+
+  if (matchedRow && matchedRow[periodKey] !== undefined) {
+    const val = matchedRow[periodKey];
+    return typeof val === 'number' ? val : (parseFloat(String(val)) || 0);
+  }
+
+  return 0;
+};
+
+// Normalize numeric values to Trillion (T) format intelligently
+const normalizeToTrillion = (val: number): number => {
+  if (!val || isNaN(val)) return 0;
+  const abs = Math.abs(val);
+
+  // If already in Trillion scale (e.g. 10 to 100,000)
+  if (abs >= 10 && abs < 1e5) {
+    return parseFloat(val.toFixed(1));
+  }
+  // If raw Rupiah (e.g. 100,000,000,000,000+ -> 1e11 to 1e16)
+  if (abs >= 1e11) {
+    return parseFloat((val / 1e12).toFixed(1));
+  }
+  // If in Ribuan Rupiah (e.g. 100,000,000,000+ -> 1e8 to 1e11)
+  if (abs >= 1e8) {
+    return parseFloat((val / 1e9).toFixed(1));
+  }
+  // If in Jutaan Rupiah (e.g. 1,000,000+ -> 1e5 to 1e8)
+  if (abs >= 1e5) {
+    return parseFloat((val / 1e3).toFixed(1));
+  }
+  return parseFloat(val.toFixed(1));
+};
+
 export default function OverviewDashboard({ activeFile, onNavigateTab }: OverviewDashboardProps) {
   // Independent Chart Type Switchers per sector (Bar vs Pie)
   const [bankUmumChartType, setBankUmumChartType] = useState<'bar' | 'pie'>('bar');
@@ -63,29 +114,53 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
     setDpkChartType(type);
   };
 
-  // Extract sheets safely
+  // Extract sheets safely with smart fallback
   const bankUmumSheet = useMemo(() => {
+    if (!activeFile?.sheets) return null;
     const key = Object.keys(activeFile.sheets).find(
       s => s.toLowerCase().includes('bank') || s.toLowerCase().includes('umum') || s.toLowerCase().includes('kinerja')
     );
-    return key ? activeFile.sheets[key] : null;
+    if (key) return activeFile.sheets[key];
+
+    const foundByData = Object.values(activeFile.sheets).find((s: any) =>
+      s.data?.some((d: any) => String(d.indicator || '').toLowerCase().includes('aset'))
+    );
+    return foundByData || Object.values(activeFile.sheets)[0] || null;
   }, [activeFile]);
 
   const kreditSheet = useMemo(() => {
+    if (!activeFile?.sheets) return null;
     const key = Object.keys(activeFile.sheets).find(
       s => s.toLowerCase().includes('kredit') || s.toLowerCase().includes('jenis')
     );
-    return key ? activeFile.sheets[key] : null;
+    if (key) return activeFile.sheets[key];
+
+    const foundByData = Object.values(activeFile.sheets).find((s: any) =>
+      s.data?.some((d: any) => {
+        const ind = String(d.indicator || '').toLowerCase();
+        return ind.includes('modal') || ind.includes('investasi') || ind.includes('konsumsi');
+      })
+    );
+    return foundByData || null;
   }, [activeFile]);
 
   const dpkSheet = useMemo(() => {
+    if (!activeFile?.sheets) return null;
     const key = Object.keys(activeFile.sheets).find(
       s => s.toLowerCase().includes('dpk') || s.toLowerCase().includes('portofolio')
     );
-    return key ? activeFile.sheets[key] : null;
+    if (key) return activeFile.sheets[key];
+
+    const foundByData = Object.values(activeFile.sheets).find((s: any) =>
+      s.data?.some((d: any) => {
+        const ind = String(d.indicator || '').toLowerCase();
+        return ind.includes('giro') || ind.includes('tabungan') || ind.includes('deposito');
+      })
+    );
+    return foundByData || null;
   }, [activeFile]);
 
-  // 1. Bank Umum Primary Chart Data
+  // 1. Bank Umum Primary Chart Data (Perbankan Jawa Barat)
   const bankUmumChartData = useMemo(() => {
     if (!bankUmumSheet) {
       return [
@@ -94,16 +169,25 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
         { period: '2026 (Mei)', Aset: 1205.9, DPK: 1090.2, Kredit: 995.4 }
       ];
     }
-    const periods = bankUmumSheet.periods.slice(-5);
+    const dataPeriods = bankUmumSheet.periods.filter(
+      p => p !== 'YOY' && p !== 'SHARE' && !p.toLowerCase().includes('yoy') && !p.toLowerCase().includes('share')
+    );
+    const periods = dataPeriods.length > 0 ? dataPeriods.slice(-5) : bankUmumSheet.periods.slice(-5);
+
     return periods.map(p => {
-      const aset = bankUmumSheet.indicatorsData['Aset']?.[p] || 0;
-      const dpk = bankUmumSheet.indicatorsData['Dana Pihak Ketiga']?.[p] || 0;
-      const kredit = bankUmumSheet.indicatorsData['Kredit']?.[p] || 0;
+      const asetRaw = getIndicatorValue(bankUmumSheet, ['aset'], p);
+      const dpkRaw = getIndicatorValue(bankUmumSheet, ['dana pihak ketiga', 'dpk'], p);
+      const kreditRaw = getIndicatorValue(bankUmumSheet, ['kredit'], p);
+
+      const aset = normalizeToTrillion(asetRaw);
+      const dpk = normalizeToTrillion(dpkRaw);
+      const kredit = normalizeToTrillion(kreditRaw);
+
       return {
-        period: p,
-        Aset: aset > 1e9 ? parseFloat((aset / 1e12).toFixed(1)) : aset,
-        DPK: dpk > 1e9 ? parseFloat((dpk / 1e12).toFixed(1)) : dpk,
-        Kredit: kredit > 1e9 ? parseFloat((kredit / 1e12).toFixed(1)) : kredit
+        period: p.replace('-', ' '),
+        Aset: aset,
+        DPK: dpk,
+        Kredit: kredit
       };
     });
   }, [bankUmumSheet]);
@@ -112,7 +196,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
   const bankUmumPieData = useMemo(() => {
     const latest = bankUmumChartData[bankUmumChartData.length - 1];
     if (!latest) return [];
-    const total = latest.Aset + latest.DPK + latest.Kredit;
+    const total = latest.Aset + latest.DPK + latest.Kredit || 1;
     return [
       { name: 'Aset', value: latest.Aset, share: parseFloat(((latest.Aset / total) * 100).toFixed(1)), color: '#C61E1E' },
       { name: 'DPK', value: latest.DPK, share: parseFloat(((latest.DPK / total) * 100).toFixed(1)), color: '#10B981' },
@@ -129,19 +213,21 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
         { period: '2026', 'Modal Kerja': 329.7, 'Investasi': 251.8, 'Konsumsi': 499.0 }
       ];
     }
-    const years = kreditSheet.years.length > 0 ? kreditSheet.years : ['2024', '2025', '2026'];
-    const month = kreditSheet.months[0] || 'Mei';
-    return years.map(y => {
-      const key = `${y}-${month}`;
-      const mkRow = kreditSheet.data.find(d => d.indicator?.toLowerCase() === 'modal kerja');
-      const invRow = kreditSheet.data.find(d => d.indicator?.toLowerCase() === 'investasi');
-      const konRow = kreditSheet.data.find(d => d.indicator?.toLowerCase() === 'konsumsi');
+    const dataPeriods = kreditSheet.periods.filter(
+      p => p !== 'YOY' && p !== 'SHARE' && !p.toLowerCase().includes('yoy') && !p.toLowerCase().includes('share')
+    );
+    const periods = dataPeriods.length > 0 ? dataPeriods.slice(-5) : kreditSheet.periods.slice(-5);
+
+    return periods.map(p => {
+      const mkRaw = getIndicatorValue(kreditSheet, ['modal kerja', 'modal'], p);
+      const invRaw = getIndicatorValue(kreditSheet, ['investasi', 'invest'], p);
+      const konRaw = getIndicatorValue(kreditSheet, ['konsumsi', 'konsum'], p);
 
       return {
-        period: y,
-        'Modal Kerja': parseFloat(((mkRow?.[key] ?? mkRow?.[y] ?? 329740604279539) / 1e12).toFixed(1)),
-        'Investasi': parseFloat(((invRow?.[key] ?? invRow?.[y] ?? 251790742742739) / 1e12).toFixed(1)),
-        'Konsumsi': parseFloat(((konRow?.[key] ?? konRow?.[y] ?? 499029032369175) / 1e12).toFixed(1))
+        period: p.replace('-', ' '),
+        'Modal Kerja': normalizeToTrillion(mkRaw),
+        'Investasi': normalizeToTrillion(invRaw),
+        'Konsumsi': normalizeToTrillion(konRaw)
       };
     });
   }, [kreditSheet]);
@@ -150,7 +236,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
   const kreditPieData = useMemo(() => {
     const latest = kreditChartData[kreditChartData.length - 1];
     if (!latest) return [];
-    const total = latest['Modal Kerja'] + latest['Investasi'] + latest['Konsumsi'];
+    const total = (latest['Modal Kerja'] || 0) + (latest['Investasi'] || 0) + (latest['Konsumsi'] || 0) || 1;
     return [
       { name: 'Konsumsi', value: latest['Konsumsi'], share: parseFloat(((latest['Konsumsi'] / total) * 100).toFixed(1)), color: '#EC4899' },
       { name: 'Modal Kerja', value: latest['Modal Kerja'], share: parseFloat(((latest['Modal Kerja'] / total) * 100).toFixed(1)), color: '#3B82F6' },
@@ -167,28 +253,52 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
         { name: 'Giro', value: 174.8, share: 22.9, color: '#6366F1' }
       ];
     }
-    const giroRow = dpkSheet.data.find(d => d.indicator?.toLowerCase() === 'giro');
-    const tabRow = dpkSheet.data.find(d => d.indicator?.toLowerCase() === 'tabungan');
-    const depRow = dpkSheet.data.find(d => d.indicator?.toLowerCase() === 'deposito');
+    const dataPeriods = dpkSheet.periods.filter(
+      p => p !== 'YOY' && p !== 'SHARE' && !p.toLowerCase().includes('yoy') && !p.toLowerCase().includes('share')
+    );
+    const latestPeriod = dataPeriods.length > 0 ? dataPeriods[dataPeriods.length - 1] : dpkSheet.periods[0];
 
-    const giroVal = (giroRow?.['2026-Mei'] ?? giroRow?.['2026'] ?? 174830850692072) / 1e12;
-    const tabVal = (tabRow?.['2026-Mei'] ?? tabRow?.['2026'] ?? 361901013518981) / 1e12;
-    const depVal = (depRow?.['2026-Mei'] ?? depRow?.['2026'] ?? 226832053960849) / 1e12;
-    const total = giroVal + tabVal + depVal;
+    const tabRaw = getIndicatorValue(dpkSheet, ['tabungan', 'tabung'], latestPeriod);
+    const depRaw = getIndicatorValue(dpkSheet, ['deposito', 'depos'], latestPeriod);
+    const giroRaw = getIndicatorValue(dpkSheet, ['giro'], latestPeriod);
+
+    const tabVal = normalizeToTrillion(tabRaw);
+    const depVal = normalizeToTrillion(depRaw);
+    const giroVal = normalizeToTrillion(giroRaw);
+    const total = tabVal + depVal + giroVal || 1;
 
     return [
-      { name: 'Tabungan', value: parseFloat(tabVal.toFixed(1)), share: parseFloat(((tabVal / total) * 100).toFixed(1)), color: '#10B981' },
-      { name: 'Deposito', value: parseFloat(depVal.toFixed(1)), share: parseFloat(((depVal / total) * 100).toFixed(1)), color: '#F59E0B' },
-      { name: 'Giro', value: parseFloat(giroVal.toFixed(1)), share: parseFloat(((giroVal / total) * 100).toFixed(1)), color: '#6366F1' }
+      { name: 'Tabungan', value: tabVal, share: parseFloat(((tabVal / total) * 100).toFixed(1)), color: '#10B981' },
+      { name: 'Deposito', value: depVal, share: parseFloat(((depVal / total) * 100).toFixed(1)), color: '#F59E0B' },
+      { name: 'Giro', value: giroVal, share: parseFloat(((giroVal / total) * 100).toFixed(1)), color: '#6366F1' }
     ];
   }, [dpkSheet]);
 
   // DPK Bar Data format
   const dpkBarData = useMemo(() => {
-    return [
-      { period: '2026 (Mei)', Tabungan: 361.9, Deposito: 226.8, Giro: 174.8 }
-    ];
-  }, []);
+    if (!dpkSheet) {
+      return [
+        { period: '2026 (Mei)', Tabungan: 361.9, Deposito: 226.8, Giro: 174.8 }
+      ];
+    }
+    const dataPeriods = dpkSheet.periods.filter(
+      p => p !== 'YOY' && p !== 'SHARE' && !p.toLowerCase().includes('yoy') && !p.toLowerCase().includes('share')
+    );
+    const periods = dataPeriods.length > 0 ? dataPeriods.slice(-5) : dpkSheet.periods.slice(-5);
+
+    return periods.map(p => {
+      const tabRaw = getIndicatorValue(dpkSheet, ['tabungan', 'tabung'], p);
+      const depRaw = getIndicatorValue(dpkSheet, ['deposito', 'depos'], p);
+      const giroRaw = getIndicatorValue(dpkSheet, ['giro'], p);
+
+      return {
+        period: p.replace('-', ' '),
+        Tabungan: normalizeToTrillion(tabRaw),
+        Deposito: normalizeToTrillion(depRaw),
+        Giro: normalizeToTrillion(giroRaw)
+      };
+    });
+  }, [dpkSheet]);
 
   return (
     <motion.div 
@@ -353,20 +463,20 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
                 {bankUmumChartType === 'bar' ? (
                   <BarChart data={bankUmumChartData} margin={{ top: 20, right: 15, left: -15, bottom: 0 }}>
                     <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B' }} />
-                    <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(v) => `Rp ${v}T`} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(v) => `${v}T`} />
                     <Tooltip 
-                      formatter={(val: any) => [`Rp ${val} Triliun`, '']}
+                      formatter={(val: any) => [`${val} Triliun`, '']}
                       contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '11px' }}
                     />
                     <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
                     <Bar dataKey="Aset" fill="#C61E1E" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="Aset" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#C61E1E' }} />
+                      <LabelList dataKey="Aset" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#C61E1E' }} />
                     </Bar>
                     <Bar dataKey="DPK" fill="#10B981" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="DPK" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#10B981' }} />
+                      <LabelList dataKey="DPK" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#10B981' }} />
                     </Bar>
                     <Bar dataKey="Kredit" fill="#3B82F6" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="Kredit" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#3B82F6' }} />
+                      <LabelList dataKey="Kredit" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#3B82F6' }} />
                     </Bar>
                   </BarChart>
                 ) : (
@@ -388,7 +498,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
                     </Pie>
                     <Tooltip 
                       formatter={(val: any, name: any, item: any) => [
-                        `Rp ${val} Triliun (${item.payload.share}%)`,
+                        `${val} Triliun (${item.payload.share}%)`,
                         name
                       ]}
                       contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '11px' }}
@@ -421,7 +531,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
                   <Wallet size={16} className="text-blue-600" />
                   <span>2. Kredit per Jenis</span>
                 </h3>
-                <p className="text-[11px] text-slate-400 font-medium">Komposisi Kredit (Triliun Rp)</p>
+                <p className="text-[11px] text-slate-400 font-medium">Komposisi Kredit (Triliun)</p>
               </div>
 
               {/* In-Card Bar vs Pie Switcher */}
@@ -457,20 +567,20 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
                 {kreditChartType === 'bar' ? (
                   <BarChart data={kreditChartData} margin={{ top: 20, right: 15, left: -15, bottom: 0 }}>
                     <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B' }} />
-                    <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(v) => `Rp ${v}T`} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(v) => `${v}T`} />
                     <Tooltip 
-                      formatter={(val: any) => [`Rp ${val} Triliun`, '']}
+                      formatter={(val: any) => [`${val} Triliun`, '']}
                       contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '11px' }}
                     />
                     <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
                     <Bar dataKey="Modal Kerja" fill="#3B82F6" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="Modal Kerja" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#3B82F6' }} />
+                      <LabelList dataKey="Modal Kerja" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#3B82F6' }} />
                     </Bar>
                     <Bar dataKey="Investasi" fill="#8B5CF6" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="Investasi" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#8B5CF6' }} />
+                      <LabelList dataKey="Investasi" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#8B5CF6' }} />
                     </Bar>
                     <Bar dataKey="Konsumsi" fill="#EC4899" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="Konsumsi" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#EC4899' }} />
+                      <LabelList dataKey="Konsumsi" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#EC4899' }} />
                     </Bar>
                   </BarChart>
                 ) : (
@@ -492,7 +602,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
                     </Pie>
                     <Tooltip 
                       formatter={(val: any, name: any, item: any) => [
-                        `Rp ${val} Triliun (${item.payload.share}%)`,
+                        `${val} Triliun (${item.payload.share}%)`,
                         name
                       ]}
                       contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '11px' }}
@@ -505,7 +615,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
           </div>
 
           <div className="pt-3 border-t border-slate-50 flex items-center justify-between text-xs font-semibold text-slate-600">
-            <span>Dominan: <strong className="text-pink-600">Konsumsi (46,18%)</strong></span>
+            <span>Dominan: <strong className="text-pink-600">Konsumsi ({kreditPieData.find(d => d.name === 'Konsumsi')?.share || '46,18'}%)</strong></span>
             <button 
               onClick={() => onNavigateTab('kredit_jenis')}
               className="text-blue-600 hover:underline font-bold flex items-center gap-0.5"
@@ -561,20 +671,20 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
                 {dpkChartType === 'bar' ? (
                   <BarChart data={dpkBarData} margin={{ top: 20, right: 15, left: -15, bottom: 0 }}>
                     <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B' }} />
-                    <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(v) => `Rp ${v}T`} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(v) => `${v}T`} />
                     <Tooltip 
-                      formatter={(val: any) => [`Rp ${val} Triliun`, '']}
+                      formatter={(val: any) => [`${val} Triliun`, '']}
                       contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '11px' }}
                     />
                     <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
                     <Bar dataKey="Tabungan" fill="#10B981" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="Tabungan" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#10B981' }} />
+                      <LabelList dataKey="Tabungan" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#10B981' }} />
                     </Bar>
                     <Bar dataKey="Deposito" fill="#F59E0B" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="Deposito" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#F59E0B' }} />
+                      <LabelList dataKey="Deposito" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#F59E0B' }} />
                     </Bar>
                     <Bar dataKey="Giro" fill="#6366F1" radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey="Giro" position="top" formatter={(v: any) => `Rp. ${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#6366F1' }} />
+                      <LabelList dataKey="Giro" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#6366F1' }} />
                     </Bar>
                   </BarChart>
                 ) : (
@@ -596,7 +706,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
                     </Pie>
                     <Tooltip 
                       formatter={(val: any, name: any, item: any) => [
-                        `Rp ${val} Triliun (${item.payload.share}%)`,
+                        `${val} Triliun (${item.payload.share}%)`,
                         name
                       ]}
                       contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '11px' }}
