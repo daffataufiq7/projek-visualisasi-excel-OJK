@@ -1,6 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ActiveFile, FilterState, UploadHistoryItem } from '../types/dashboard';
 import { parseExcelFile, generateMockFile } from '../services/excelService';
+import { 
+  saveHistoryToDB, 
+  loadHistoryFromDB, 
+  saveActiveIdsToDB, 
+  loadActiveIdsFromDB 
+} from '../utils/dbStorage';
 
 const LOCAL_STORAGE_HISTORY_KEY = 'finsight_upload_history';
 const LOCAL_STORAGE_ACTIVE_IDS_KEY = 'finsight_active_file_ids';
@@ -116,18 +122,23 @@ export function useDashboardState() {
         const serverHistory = data.history || [];
         const serverActiveFileIds = data.activeFileIds || {};
 
-        // Read local user uploads from localStorage
+        // Read local user uploads from IndexedDB & localStorage
+        const dbItems = await loadHistoryFromDB();
         const storedLocalHistoryRaw = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
-        let localUserUploads: UploadHistoryItem[] = [];
+        let localUserUploads: UploadHistoryItem[] = dbItems.filter((h: any) => !h.isSample);
+
         if (storedLocalHistoryRaw) {
           try {
             const parsed = JSON.parse(storedLocalHistoryRaw) as UploadHistoryItem[];
-            localUserUploads = parsed.filter(
+            const lsUploads = parsed.filter(
               h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
             );
-          } catch (e) {
-            localUserUploads = [];
-          }
+            lsUploads.forEach(item => {
+              if (!localUserUploads.some(d => d.id === item.id)) {
+                localUserUploads.push(item);
+              }
+            });
+          } catch (e) {}
         }
 
         const cleanedServerHistory = serverHistory.filter(
@@ -146,11 +157,12 @@ export function useDashboardState() {
         const combinedHistory = [...defaultMockItems, ...mergedUserUploads];
         setHistory(combinedHistory);
 
-        // Restore active IDs from localStorage if available
+        // Restore active IDs from IndexedDB & localStorage
+        const dbActiveIds = await loadActiveIdsFromDB();
         const storedActiveIdsRaw = localStorage.getItem(LOCAL_STORAGE_ACTIVE_IDS_KEY);
-        let localActiveIds = {};
+        let localActiveIds = dbActiveIds || {};
         if (storedActiveIdsRaw) {
-          try { localActiveIds = JSON.parse(storedActiveIdsRaw); } catch(e){}
+          try { localActiveIds = { ...localActiveIds, ...JSON.parse(storedActiveIdsRaw) }; } catch(e){}
         }
 
         setActiveFileIds(prev => ({
@@ -159,10 +171,15 @@ export function useDashboardState() {
           ...localActiveIds
         }));
 
-        localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(combinedHistory));
+        saveHistoryToDB(combinedHistory);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(combinedHistory));
+        } catch (e) {
+          // Ignore localStorage quota errors silently since IndexedDB safely holds the data
+        }
       }
     } catch (err) {
-      console.warn('API sync failed, falling back to localStorage:', err);
+      console.warn('API sync failed, falling back to local DB:', err);
     }
   }, [defaultMockItems]);
 
@@ -189,35 +206,35 @@ export function useDashboardState() {
       },
     });
 
-    // Try reading active file IDs from localStorage first
-    const storedActiveIds = localStorage.getItem(LOCAL_STORAGE_ACTIVE_IDS_KEY);
-    if (storedActiveIds) {
-      try {
-        const parsed = JSON.parse(storedActiveIds);
-        if (parsed && typeof parsed === 'object') {
-          setActiveFileIds(prev => ({
-            ...prev,
-            ...parsed
-          }));
-        }
-      } catch (e) {}
-    }
-
-    // Try reading localStorage first for immediate render
-    const storedHistory = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
-    if (storedHistory) {
-      try {
-        const parsedHistory = JSON.parse(storedHistory) as UploadHistoryItem[];
-        const cleanedHistory = parsedHistory.filter(
-          h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
-        );
-        setHistory([...defaultMockItems, ...cleanedHistory]);
-      } catch (e) {
-        setHistory(defaultMockItems);
+    // Load active file IDs from IndexedDB / localStorage
+    loadActiveIdsFromDB().then(dbActive => {
+      const storedActiveIds = localStorage.getItem(LOCAL_STORAGE_ACTIVE_IDS_KEY);
+      let combined = dbActive || {};
+      if (storedActiveIds) {
+        try { combined = { ...combined, ...JSON.parse(storedActiveIds) }; } catch(e){}
       }
-    } else {
-      setHistory(defaultMockItems);
-    }
+      if (Object.keys(combined).length > 0) {
+        setActiveFileIds(prev => ({ ...prev, ...combined }));
+      }
+    });
+
+    // Load history from IndexedDB & localStorage for immediate render
+    loadHistoryFromDB().then(dbItems => {
+      const storedHistory = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
+      let userItems: UploadHistoryItem[] = dbItems.filter((h: any) => !h.isSample);
+      if (storedHistory) {
+        try {
+          const parsed = JSON.parse(storedHistory) as UploadHistoryItem[];
+          const lsItems = parsed.filter(h => !h.isSample);
+          lsItems.forEach(item => {
+            if (!userItems.some(d => d.id === item.id)) {
+              userItems.push(item);
+            }
+          });
+        } catch (e) {}
+      }
+      setHistory([...defaultMockItems, ...userItems]);
+    });
 
     // Sync with Server API immediately
     fetchServerState();
@@ -308,14 +325,22 @@ export function useDashboardState() {
 
         const updatedHistory = [newItem, ...history.filter(h => h.name !== file.name)];
         setHistory(updatedHistory);
-        localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+        saveHistoryToDB(updatedHistory);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+        } catch (e) {
+          // Ignore localStorage quota errors silently since IndexedDB safely holds the data
+        }
 
         const updatedActiveIds = {
           ...activeFileIds,
           [redirectTab]: newId,
         };
         setActiveFileIds(updatedActiveIds);
-        localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(updatedActiveIds));
+        saveActiveIdsToDB(updatedActiveIds);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(updatedActiveIds));
+        } catch (e) {}
 
         // Sync uploaded data to Next.js server so Ngrok users see it instantly!
         try {
