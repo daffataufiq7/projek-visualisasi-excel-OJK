@@ -21,11 +21,16 @@ import YoyDashboardWidget from '../components/YoyDashboardWidget';
 import KreditJenisView from '../components/KreditJenisView';
 import DpkView from '../components/DpkView';
 import OverviewDashboard from '../components/OverviewDashboard';
+import LoginPage from '../components/LoginPage';
 
 import { useDashboardState } from '../hooks/useDashboardState';
 
 export default function Home() {
   const {
+    isAuthenticated,
+    currentUser,
+    login,
+    logout,
     activeFile,
     history,
     activeTab,
@@ -320,6 +325,18 @@ export default function Home() {
     }
   };
 
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Head>
+          <title>Login - FINSIGHT Financial Data Visualization Dashboard OJK Jabar</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+        </Head>
+        <LoginPage onLogin={login} />
+      </>
+    );
+  }
+
   return (
     <>
       <Head>
@@ -333,6 +350,8 @@ export default function Home() {
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
         activeFile={activeFile}
+        currentUser={currentUser}
+        onLogout={logout}
       >
         <AnimatePresence mode="wait">
           {renderActiveContent()}

@@ -12,6 +12,37 @@ const LOCAL_STORAGE_HISTORY_KEY = 'finsight_upload_history';
 const LOCAL_STORAGE_ACTIVE_IDS_KEY = 'finsight_active_file_ids';
 
 export function useDashboardState() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<{ nipOrEmail: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedUser = localStorage.getItem('finsight_auth_user');
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed && parsed.nipOrEmail) {
+            setIsAuthenticated(true);
+            setCurrentUser(parsed);
+          }
+        } catch (e) {}
+      }
+    }
+  }, []);
+
+  const login = (nipOrEmail: string, password: string) => {
+    const userObj = { nipOrEmail, loginTime: new Date().toISOString() };
+    setIsAuthenticated(true);
+    setCurrentUser(userObj);
+    localStorage.setItem('finsight_auth_user', JSON.stringify(userObj));
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    localStorage.removeItem('finsight_auth_user');
+  };
+
   const [activeFileIds, setActiveFileIds] = useState<{ [category: string]: string }>({
     bank_umum: 'default-mock-bank',
     kredit_jenis: 'default-mock-kredit',
@@ -538,6 +569,10 @@ export function useDashboardState() {
   };
 
   return {
+    isAuthenticated,
+    currentUser,
+    login,
+    logout,
     activeFile,
     history,
     activeTab,

@@ -17,7 +17,8 @@ import {
   TrendingUp,
   Building2,
   CreditCard,
-  Wallet
+  Wallet,
+  LogOut
 } from 'lucide-react';
 import Logo from './Logo';
 import { ActiveFile } from '../types/dashboard';
@@ -29,6 +30,8 @@ interface LayoutProps {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
   activeFile: ActiveFile | null;
+  currentUser?: { nipOrEmail: string } | null;
+  onLogout?: () => void;
 }
 
 export default function Layout({
@@ -37,7 +40,9 @@ export default function Layout({
   setActiveTab,
   sidebarCollapsed,
   setSidebarCollapsed,
-  activeFile
+  activeFile,
+  currentUser,
+  onLogout
 }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -98,7 +103,7 @@ export default function Layout({
 
         {/* Navigation Items */}
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-          {menuItems.map((item: any) => {
+          {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             const hasSubItems = item.subItems && item.subItems.length > 0;
@@ -108,22 +113,24 @@ export default function Layout({
               <div key={item.id} className="space-y-1">
                 <button
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all duration-200 group ${
                     isActive 
-                      ? 'bg-[#C61E1E] text-white shadow-md shadow-red-900/10 font-semibold' 
+                      ? 'bg-[#C61E1E] text-white shadow-md shadow-red-600/20 font-bold' 
                       : isParentActive
-                        ? 'bg-slate-50 text-[#C61E1E] font-semibold'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-[#C61E1E]'
-                  } ${sidebarCollapsed ? 'justify-center' : ''}`}
+                        ? 'bg-slate-100 text-[#C61E1E] font-bold'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                  }`}
                   title={sidebarCollapsed ? item.name : undefined}
                 >
-                  <Icon size={20} className={isActive ? 'text-white' : isParentActive ? 'text-[#C61E1E]' : ''} />
-                  {!sidebarCollapsed && <span className="text-sm">{item.name}</span>}
+                  <div className="flex items-center gap-3">
+                    <Icon size={18} className={isActive ? 'text-white' : isParentActive ? 'text-[#C61E1E]' : 'text-slate-400 group-hover:text-slate-600'} />
+                    {!sidebarCollapsed && <span className="text-xs">{item.name}</span>}
+                  </div>
                 </button>
                 
                 {/* Render sub-items if parent is expanded (sidebar not collapsed) */}
                 {hasSubItems && !sidebarCollapsed && (
-                  <div className="pl-6 space-y-1 mt-1 border-l-2 border-slate-100 ml-6">
+                  <div className="pl-6 space-y-1 mt-1 border-l-2 border-slate-100 ml-5">
                     {item.subItems.map((sub: any) => {
                       const SubIcon = sub.icon;
                       const isSubActive = activeTab === sub.id;
@@ -151,22 +158,44 @@ export default function Layout({
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-50">
+        <div className="p-4 border-t border-slate-100 space-y-2">
           {!sidebarCollapsed ? (
-            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl">
-              <div className="w-8 h-8 rounded-full bg-[#C61E1E]/10 flex items-center justify-center text-[#C61E1E]">
-                <User size={16} />
+            <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-[#C61E1E]/10 flex items-center justify-center text-[#C61E1E] font-bold shrink-0">
+                  <User size={15} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold truncate text-slate-800">
+                    {currentUser?.nipOrEmail || 'Pegawai OJK'}
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-medium truncate">Internal Staff</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate text-slate-800">Admin OJK Jabar</p>
-                <p className="text-[10px] text-slate-400 truncate">Internal Staff</p>
-              </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="p-1.5 text-slate-400 hover:text-[#C61E1E] hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                  title="Keluar / Logout"
+                >
+                  <LogOut size={16} />
+                </button>
+              )}
             </div>
           ) : (
-            <div className="w-full flex justify-center">
-              <div className="w-8 h-8 rounded-full bg-[#C61E1E]/10 flex items-center justify-center text-[#C61E1E]" title="Admin OJK Jabar">
+            <div className="w-full flex flex-col items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-[#C61E1E]/10 flex items-center justify-center text-[#C61E1E]" title={currentUser?.nipOrEmail || 'Pegawai OJK'}>
                 <User size={16} />
               </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="p-1.5 text-slate-400 hover:text-[#C61E1E] hover:bg-red-50 rounded-lg transition-colors"
+                  title="Keluar / Logout"
+                >
+                  <LogOut size={16} />
+                </button>
+              )}
             </div>
           )}
         </div>
