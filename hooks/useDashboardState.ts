@@ -13,7 +13,7 @@ const LOCAL_STORAGE_ACTIVE_IDS_KEY = 'finsight_active_file_ids';
 
 export function useDashboardState() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<{ nipOrEmail: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; role: string } | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -21,17 +21,26 @@ export function useDashboardState() {
       if (savedUser) {
         try {
           const parsed = JSON.parse(savedUser);
-          if (parsed && parsed.nipOrEmail) {
+          if (parsed) {
             setIsAuthenticated(true);
-            setCurrentUser(parsed);
+            setCurrentUser({
+              name: parsed.name || 'Daffa Taufiq',
+              email: parsed.email || parsed.nipOrEmail || 'daffataufiq@ojk.go.id',
+              role: parsed.role || 'Admin OJK Jabar'
+            });
           }
         } catch (e) {}
       }
     }
   }, []);
 
-  const login = (nipOrEmail: string, password: string) => {
-    const userObj = { nipOrEmail, loginTime: new Date().toISOString() };
+  const login = (nipOrEmail: string, password: string, name: string = 'Daffa Taufiq', role: string = 'Admin OJK Jabar') => {
+    const userObj = {
+      name: name || (nipOrEmail.toLowerCase().includes('daffa') ? 'Daffa Taufiq' : nipOrEmail),
+      email: nipOrEmail,
+      role: role || 'Admin OJK Jabar',
+      loginTime: new Date().toISOString()
+    };
     setIsAuthenticated(true);
     setCurrentUser(userObj);
     localStorage.setItem('finsight_auth_user', JSON.stringify(userObj));

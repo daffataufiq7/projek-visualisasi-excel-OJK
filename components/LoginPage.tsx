@@ -8,8 +8,8 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
-  const [nipOrEmail, setNipOrEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [nipOrEmail, setNipOrEmail] = useState('daffataufiq@ojk.go.id');
+  const [password, setPassword] = useState('admin123');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,6 +33,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       onLogin(nipOrEmail, password);
       setIsSubmitting(false);
     }, 600);
+  };
+
+  const handleQuickAdminLogin = () => {
+    setNipOrEmail('daffataufiq@ojk.go.id');
+    setPassword('admin123');
+    setIsSubmitting(true);
+    setTimeout(() => {
+      onLogin('daffataufiq@ojk.go.id', 'admin123');
+      setIsSubmitting(false);
+    }, 400);
   };
 
   return (
@@ -126,6 +136,30 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <p className="text-xs text-slate-500 font-medium">
                 Masuk untuk mengakses dashboard visualisasi data keuangan
               </p>
+            </div>
+
+            {/* Quick Login Admin Info Pill */}
+            <div className="bg-red-50/80 border border-red-100 p-3 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-[#C61E1E] text-white flex items-center justify-center font-extrabold text-xs shrink-0 shadow-sm">
+                  DT
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-slate-800 truncate">Daffa Taufiq</span>
+                    <span className="bg-[#C61E1E] text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">Admin OJK</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 font-medium truncate">daffataufiq@ojk.go.id</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleQuickAdminLogin}
+                className="bg-[#C61E1E] hover:bg-red-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-1 cursor-pointer"
+              >
+                <span>Masuk Admin</span>
+                <ChevronRight size={13} />
+              </button>
             </div>
 
             {/* Error Message */}

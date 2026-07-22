@@ -30,7 +30,7 @@ interface LayoutProps {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
   activeFile: ActiveFile | null;
-  currentUser?: { nipOrEmail: string } | null;
+  currentUser?: { name?: string; email?: string; role?: string; nipOrEmail?: string } | null;
   onLogout?: () => void;
 }
 
@@ -167,9 +167,11 @@ export default function Layout({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate text-slate-800">
-                    {currentUser?.nipOrEmail || 'Pegawai OJK'}
+                    {currentUser?.name || currentUser?.nipOrEmail || 'Daffa Taufiq'}
                   </p>
-                  <p className="text-[10px] text-slate-400 font-medium truncate">Internal Staff</p>
+                  <p className="text-[10px] text-slate-500 font-semibold truncate">
+                    {currentUser?.role || 'Admin OJK Jabar'}
+                  </p>
                 </div>
               </div>
               {onLogout && (
@@ -184,7 +186,7 @@ export default function Layout({
             </div>
           ) : (
             <div className="w-full flex flex-col items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#C61E1E]/10 flex items-center justify-center text-[#C61E1E]" title={currentUser?.nipOrEmail || 'Pegawai OJK'}>
+              <div className="w-8 h-8 rounded-full bg-[#C61E1E]/10 flex items-center justify-center text-[#C61E1E]" title={`${currentUser?.name || 'Daffa Taufiq'} (${currentUser?.role || 'Admin OJK Jabar'})`}>
                 <User size={16} />
               </div>
               {onLogout && (
