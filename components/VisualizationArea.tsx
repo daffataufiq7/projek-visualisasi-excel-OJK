@@ -227,10 +227,17 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
       });
     }
 
-    if (maxVal >= 1e12) return specs.trillion;
-    if (maxVal >= 1e9) return specs.billion;
-    if (maxVal >= 1e6) return specs.million;
-    if (maxVal >= 1e3) return specs.thousand;
+    // Auto Unit Detection based on value magnitude in uploaded Excel sheet:
+    // 1. Raw Rupiah (>= 1e11): divide by 1e12 -> Triliun
+    if (maxVal >= 1e11) return specs.trillion;
+    // 2. Ribuan Rupiah (>= 1e8): divide by 1e9 -> Triliun
+    if (maxVal >= 1e8) return { factor: 1e9, label: 'dalam Rp triliun', shortLabel: 'Triliun' };
+    // 3. Jutaan Rupiah (>= 1e5): divide by 1e3 -> Triliun
+    if (maxVal >= 1e5) return { factor: 1e3, label: 'dalam Rp triliun', shortLabel: 'Triliun' };
+    // 4. Data entered ALREADY in Trillions (between 10 and 100,000 like 1205.93, 1084.9, 351.4):
+    // Do NOT divide! Keep factor = 1, but set label to "dalam Rp triliun"
+    if (maxVal >= 10) return { factor: 1, label: 'dalam Rp triliun', shortLabel: 'Triliun' };
+
     return specs.raw;
   }, [unitType, filteredData, activeYAxis, activeSheetData]);
 

@@ -203,9 +203,28 @@ export default function DpkView({ activeFile }: DpkViewProps) {
   };
 
   // Helper formatting
+  const safeToTrillion = (val: number): number => {
+    if (!val || isNaN(val)) return 0;
+    const abs = Math.abs(val);
+
+    if (abs >= 10 && abs < 1e5) {
+      return val;
+    }
+    if (abs >= 1e11) {
+      return val / 1e12;
+    }
+    if (abs >= 1e8) {
+      return val / 1e9;
+    }
+    if (abs >= 1e5) {
+      return val / 1e3;
+    }
+    return val;
+  };
+
   const formatRupiahTrillion = (val: number) => {
     if (!val) return 'Rp 0';
-    const trillion = val / 1e12;
+    const trillion = safeToTrillion(val);
     return `Rp ${trillion.toFixed(2)} T`;
   };
 
@@ -224,11 +243,12 @@ export default function DpkView({ activeFile }: DpkViewProps) {
 
     const result = categoriesToCompare.map(cat => {
       const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
-      const valTarget = row ? (row[targetKey] ?? row[effYoyTarget] ?? 0) : 0;
-      const valBase = row ? (row[baseKey] ?? row[effYoyBase] ?? 0) : 0;
+      const rawTarget = row ? (row[targetKey] ?? row[effYoyTarget] ?? 0) : 0;
+      const rawBase = row ? (row[baseKey] ?? row[effYoyBase] ?? 0) : 0;
+      const valTarget = safeToTrillion(rawTarget);
+      const valBase = safeToTrillion(rawBase);
 
-      const diffNominal = valTarget - valBase;
-      const diffTrillion = diffNominal / 1e12;
+      const diffTrillion = valTarget - valBase;
 
       let yoyPct = 0;
       if (valBase !== 0) {
@@ -239,8 +259,8 @@ export default function DpkView({ activeFile }: DpkViewProps) {
 
       return {
         category: cat,
-        valTarget: valTarget / 1e12,
-        valBase: valBase / 1e12,
+        valTarget,
+        valBase,
         diffTrillion,
         yoyPct,
         isPositive: yoyPct >= 0
@@ -250,8 +270,10 @@ export default function DpkView({ activeFile }: DpkViewProps) {
     // Add Total Row to YoY Comparison
     const totalRowData = rawSheet.data.find(r => r.indicator?.toLowerCase() === 'total' || r.indicator === 'Total');
     if (totalRowData) {
-      const totTarget = (totalRowData[targetKey] ?? totalRowData[effYoyTarget] ?? 0) / 1e12;
-      const totBase = (totalRowData[baseKey] ?? totalRowData[effYoyBase] ?? 0) / 1e12;
+      const rawTotTarget = totalRowData[targetKey] ?? totalRowData[effYoyTarget] ?? 0;
+      const rawTotBase = totalRowData[baseKey] ?? totalRowData[effYoyBase] ?? 0;
+      const totTarget = safeToTrillion(rawTotTarget);
+      const totBase = safeToTrillion(rawTotBase);
       const totDiff = totTarget - totBase;
       let totYoy = 0;
       if (totBase !== 0) {
@@ -280,7 +302,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
     let totalVal = 0;
     const totalRowData = rawSheet.data.find(r => r.indicator?.toLowerCase() === 'total' || r.indicator === 'Total');
     if (totalRowData && (totalRowData[shareKey] !== undefined || totalRowData[effShareYear] !== undefined)) {
-      totalVal = ((totalRowData[shareKey] ?? totalRowData[effShareYear] ?? 0) / 1e12);
+      totalVal = safeToTrillion(totalRowData[shareKey] ?? totalRowData[effShareYear] ?? 0);
     }
 
     if (totalVal === 0) {
@@ -288,14 +310,14 @@ export default function DpkView({ activeFile }: DpkViewProps) {
       selectedCategories.forEach(cat => {
         const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
         if (row) {
-          totalVal += (row[shareKey] ?? row[effShareYear] ?? 0) / 1e12;
+          totalVal += safeToTrillion(row[shareKey] ?? row[effShareYear] ?? 0);
         }
       });
     }
 
     const items = selectedCategories.map(cat => {
       const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
-      const val = row ? ((row[shareKey] ?? row[effShareYear] ?? 0) / 1e12) : 0;
+      const val = row ? safeToTrillion(row[shareKey] ?? row[effShareYear] ?? 0) : 0;
       let sharePct = 0;
       if (effShareYear === '2026' && row && typeof row['SHARE'] === 'number') {
         sharePct = row['SHARE'] > 1 ? row['SHARE'] : row['SHARE'] * 100;
@@ -324,7 +346,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
       selectedCategories.forEach(cat => {
         const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
         const rawVal = row ? (row[p.key] || row[p.year] || 0) : 0;
-        entry[cat] = rawVal / 1e12; // in Trillion IDR
+        entry[cat] = safeToTrillion(rawVal);
       });
       return entry;
     });
