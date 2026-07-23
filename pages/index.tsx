@@ -265,6 +265,7 @@ export default function Home() {
               activeFile={activeFile}
               defaultSheet={filterState.sheet}
               hideSheetSelect={true}
+              hideSummaryCards={true}
             />
             {(() => {
               const tableSheet = activeFile.sheets[filterState.sheet] 

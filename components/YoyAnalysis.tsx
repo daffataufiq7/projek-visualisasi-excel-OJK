@@ -29,6 +29,7 @@ interface YoyAnalysisProps {
   activeFile: ActiveFile;
   defaultSheet?: string;
   hideSheetSelect?: boolean;
+  hideSummaryCards?: boolean;
 }
 
 interface YoyItem {
@@ -42,7 +43,12 @@ interface YoyItem {
   errorMessage: string;
 }
 
-export default function YoyAnalysis({ activeFile, defaultSheet, hideSheetSelect = false }: YoyAnalysisProps) {
+export default function YoyAnalysis({ 
+  activeFile, 
+  defaultSheet, 
+  hideSheetSelect = false,
+  hideSummaryCards = false
+}: YoyAnalysisProps) {
   const sheetNames = activeFile.sheetNames;
   const [selectedSheet, setSelectedSheet] = useState<string>(defaultSheet || sheetNames[0] || '');
 
@@ -573,40 +579,42 @@ export default function YoyAnalysis({ activeFile, defaultSheet, hideSheetSelect 
       ) : (
         <>
           {/* Summary Metric Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {yoyDataList
-              .filter(item => selectedIndicators.includes(item.indicator))
-              .map((item) => {
-                const showVal = (val: number | null) => {
-                  if (val === null) return '-';
-                  return item.isRatio ? `${val.toLocaleString('id-ID')}%` : val.toLocaleString('id-ID');
-                };
+          {!hideSummaryCards && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              {yoyDataList
+                .filter(item => selectedIndicators.includes(item.indicator))
+                .map((item) => {
+                  const showVal = (val: number | null) => {
+                    if (val === null) return '-';
+                    return item.isRatio ? `${val.toLocaleString('id-ID')}%` : val.toLocaleString('id-ID');
+                  };
 
-                return (
-                  <div
-                    key={item.indicator}
-                    className="bg-white border border-slate-100 p-4.5 rounded-2xl shadow-soft flex flex-col justify-between space-y-3 hover:border-[#C61E1E]/20 transition-all group"
-                  >
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate" title={item.indicator}>
-                        {item.indicator}
-                      </span>
-                      <h4 className="text-sm font-black text-slate-800 font-mono tracking-tight">
-                        {showVal(item.currentVal)}
-                      </h4>
-                      <p className="text-[9px] font-semibold text-slate-400">
-                        Tahun {prevYear}: {showVal(item.prevVal)}
-                      </p>
-                    </div>
+                  return (
+                    <div
+                      key={item.indicator}
+                      className="bg-white border border-slate-100 p-4.5 rounded-2xl shadow-soft flex flex-col justify-between space-y-3 hover:border-[#C61E1E]/20 transition-all group"
+                    >
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block truncate" title={item.indicator}>
+                          {item.indicator}
+                        </span>
+                        <h4 className="text-sm font-black text-slate-800 font-mono tracking-tight">
+                          {showVal(item.currentVal)}
+                        </h4>
+                        <p className="text-[9px] font-semibold text-slate-400">
+                          Tahun {prevYear}: {showVal(item.prevVal)}
+                        </p>
+                      </div>
 
-                    <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
-                      <span className="text-[9px] font-extrabold text-slate-400 tracking-wide uppercase">YoY</span>
-                      {renderBadge(item)}
+                      <div className="flex items-center justify-between border-t border-slate-50 pt-2.5">
+                        <span className="text-[9px] font-extrabold text-slate-400 tracking-wide uppercase">YoY</span>
+                        {renderBadge(item)}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-          </div>
+                  );
+                })}
+            </div>
+          )}
 
           {/* Visualizations Area */}
           <div className="w-full">
