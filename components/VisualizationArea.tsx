@@ -36,6 +36,16 @@ const CHART_COLORS = [
   '#F59E0B', // Amber
 ];
 
+const getIndicatorColor = (indicator: string, index: number): string => {
+  if (indicator.toLowerCase().includes('npl')) {
+    return '#FF7300'; // High-contrast Orange for NPL
+  }
+  if (indicator.toLowerCase().includes('ldr')) {
+    return '#10B981'; // High-contrast Emerald Green for LDR
+  }
+  return CHART_COLORS[index % CHART_COLORS.length];
+};
+
 const getLabelColors = (stroke: string) => {
   const mapping: { [key: string]: { bg: string; border: string; text: string } } = {
     '#C61E1E': { bg: '#FFF5F5', border: '#F3DADA', text: '#C61E1E' },
@@ -44,6 +54,8 @@ const getLabelColors = (stroke: string) => {
     '#0D9488': { bg: '#F0FDFA', border: '#CCFBF1', text: '#0F766E' },
     '#8B5CF6': { bg: '#F5F3FF', border: '#DDD6FE', text: '#6D28D9' },
     '#F59E0B': { bg: '#FFFBEB', border: '#FEF3C7', text: '#B45309' },
+    '#FF7300': { bg: '#FFF7ED', border: '#FFEDD5', text: '#EA580C' }, // Orange for NPL
+    '#10B981': { bg: '#ECFDF5', border: '#A7F3D0', text: '#047857' }, // Emerald Green for LDR
   };
   return mapping[stroke] || { bg: '#F8FAFC', border: '#E2E8F0', text: '#475569' };
 };
@@ -768,7 +780,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                   name={indicator}
                   dataKey={safeKey} 
                   yAxisId="left"
-                  fill={CHART_COLORS[indIdx % CHART_COLORS.length]} 
+                  fill={getIndicatorColor(indicator, indIdx)} 
                   radius={[4, 4, 0, 0]}
                   maxBarSize={50}
                   label={{
@@ -813,7 +825,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                   type="monotone"
                   dataKey={safeKey}
                   yAxisId="left"
-                  stroke={CHART_COLORS[indIdx % CHART_COLORS.length]}
+                  stroke={getIndicatorColor(indicator, indIdx)}
                   strokeWidth={2.5}
                   activeDot={{ r: 6, strokeWidth: 0 }}
                   dot={{ r: 4, strokeWidth: 1 }}
@@ -885,7 +897,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                     name={indicator}
                     dataKey={safeKey}
                     yAxisId={axisId}
-                    fill={CHART_COLORS[indIdx % CHART_COLORS.length]}
+                    fill={getIndicatorColor(indicator, indIdx)}
                     radius={[4, 4, 0, 0]}
                     maxBarSize={50}
                     label={{
@@ -933,7 +945,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                   type="monotone"
                   dataKey={safeKey}
                   yAxisId={axisId}
-                  stroke={CHART_COLORS[indIdx % CHART_COLORS.length]}
+                  stroke={getIndicatorColor(indicator, indIdx)}
                   strokeWidth={2.5}
                   activeDot={{ r: 6, strokeWidth: 0 }}
                   dot={{ r: 3, strokeWidth: 1 }}
@@ -953,8 +965,8 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                 const indIdx = activeSheetData.indicators.indexOf(indicator);
                 return (
                   <linearGradient key={indicator} id={`grad-${indIdx}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_COLORS[indIdx % CHART_COLORS.length]} stopOpacity={0.25} />
-                    <stop offset="95%" stopColor={CHART_COLORS[indIdx % CHART_COLORS.length]} stopOpacity={0.01} />
+                    <stop offset="5%" stopColor={getIndicatorColor(indicator, indIdx)} stopOpacity={0.25} />
+                    <stop offset="95%" stopColor={getIndicatorColor(indicator, indIdx)} stopOpacity={0.01} />
                   </linearGradient>
                 );
               })}
@@ -987,7 +999,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                   type="monotone"
                   dataKey={safeKey}
                   yAxisId={axisId}
-                  stroke={CHART_COLORS[indIdx % CHART_COLORS.length]}
+                  stroke={getIndicatorColor(indicator, indIdx)}
                   strokeWidth={2.5}
                   fillOpacity={1}
                   fill={`url(#grad-${indIdx})`}
@@ -1027,7 +1039,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
               dataKey="value"
             >
               {pieData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={CHART_COLORS[entry.colorIndex % CHART_COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={getIndicatorColor(entry.name, entry.colorIndex)} />
               ))}
             </Pie>
             <Tooltip content={<CustomTooltip />} />
@@ -1070,7 +1082,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                     key={indicator}
                     name={indicator}
                     dataKey={safeKey}
-                    fill={CHART_COLORS[indIdx % CHART_COLORS.length]}
+                    fill={getIndicatorColor(indicator, indIdx)}
                     radius={[0, 4, 4, 0]}
                     maxBarSize={30}
                     label={{
