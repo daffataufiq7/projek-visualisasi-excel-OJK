@@ -14,6 +14,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,100 +47,111 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen w-full bg-slate-950 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans">
-      {/* Dynamic Background Glow & Ambient Lighting */}
-      <div className="absolute top-1/4 -left-20 w-96 h-96 bg-[#C61E1E]/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 -right-20 w-[500px] h-[500px] bg-[#C61E1E]/15 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen w-full relative overflow-hidden bg-slate-950 flex items-center justify-between p-4 sm:p-8 lg:p-14 font-sans select-none">
 
-      {/* Main Container */}
-      <div className="w-full max-w-6xl bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10">
+      {/* FULLSCREEN BACKGROUND IMAGE: Foto Kantor OJK Jawa Barat */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 scale-105"
+        style={{
+          backgroundImage: `url('/kantor_ojk.jpeg')`
+        }}
+      />
 
-        {/* LEFT SIDE: HERO BANNER & BUILDING MOCKUP */}
-        <div className="lg:col-span-6 relative bg-gradient-to-br from-slate-900 via-slate-950 to-[#500a0a] p-8 lg:p-12 flex flex-col justify-between overflow-hidden min-h-[400px] lg:min-h-[640px]">
-          {/* Subtle Grid Pattern Overlay */}
-          <div
-            className="absolute inset-0 opacity-15 pointer-events-none"
-            style={{
-              backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.2) 1px, transparent 0)`,
-              backgroundSize: '24px 24px'
-            }}
-          />
+      {/* GRADIENT & LIGHTING OVERLAYS */}
+      {/* Dark overlay on the left for text contrast */}
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/50 to-transparent z-0 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-transparent to-slate-950/40 z-0 pointer-events-none" />
 
-          {/* Foto Gedung Kantor Regional OJK Jawa Barat Asli */}
-          <div className="absolute inset-0 bg-cover bg-center opacity-65 transition-all duration-700" style={{
-            backgroundImage: `url('/kantor_ojk.jpeg')`
-          }} />
+      {/* Red Ambient Glow behind the Login Card (Right Side) */}
+      <div className="absolute -right-20 top-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#C61E1E]/30 rounded-full blur-[120px] pointer-events-none z-0" />
+      <div className="absolute -right-10 top-1/3 w-[350px] h-[350px] bg-red-500/25 rounded-full blur-[90px] pointer-events-none z-0" />
 
-          {/* Gradient Overlay untuk keterbacaan teks */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-950/20" />
+      {/* Dynamic Grid Dot Pattern Overlay */}
+      <div 
+        className="absolute inset-0 opacity-20 pointer-events-none z-0"
+        style={{
+          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.25) 1px, transparent 0)`,
+          backgroundSize: '28px 28px'
+        }}
+      />
 
-          {/* Top Logo / Brand Pill */}
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="bg-white/10 backdrop-blur-md border border-white/15 px-4 py-2 rounded-2xl flex items-center gap-3">
+      {/* MAIN CONTENT WRAPPER CONTAINER */}
+      <div className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10 min-h-[calc(100vh-4rem)]">
+
+        {/* LEFT SIDE: HERO HEADLINE & BRANDING */}
+        <div className="lg:col-span-7 flex flex-col justify-between py-6 space-y-8">
+          
+          {/* Top Logo / Brand Badge */}
+          <div className="flex items-center gap-3">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 rounded-2xl flex items-center gap-3 shadow-lg">
               <Logo />
-              <div className="h-4 w-[1px] bg-white/20" />
-              <span className="text-xs font-bold tracking-widest text-slate-200 uppercase">JAWA BARAT</span>
+              <div className="h-4 w-[1px] bg-white/30" />
+              <span className="text-xs font-black tracking-widest text-white uppercase">JAWA BARAT</span>
             </div>
           </div>
 
           {/* Main Hero Headline */}
-          <div className="relative z-10 space-y-4 my-auto py-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight tracking-tight">
-                Financial <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-rose-300 to-white">
-                  Visualization
-                </span> <br />
-                Dashboard
-              </h1>
-              <p className="text-sm sm:text-base text-slate-300 mt-4 leading-relaxed font-medium max-w-md">
-                Visualisasi otomatis data keuangan dari file Excel untuk analisis kinerja dan rasio perbankan regional Jawa Barat.
-              </p>
-            </motion.div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7 }}
+            className="space-y-4 max-w-xl my-auto"
+          >
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[1.1] tracking-tight drop-shadow-md">
+              Financial <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-rose-200 to-white">
+                Visualization
+              </span> <br />
+              Dashboard
+            </h1>
+            
+            <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-medium max-w-md drop-shadow-sm">
+              Visualisasi otomatis data keuangan dari file Excel untuk analisis kinerja dan rasio perbankan regional Jawa Barat.
+            </p>
+          </motion.div>
 
           {/* Bottom Security Badge */}
-          <div className="relative z-10">
-            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-3.5 rounded-2xl flex items-center gap-3 max-w-sm">
-              <div className="w-9 h-9 rounded-xl bg-[#C61E1E]/20 border border-[#C61E1E]/40 flex items-center justify-center shrink-0">
-                <ShieldCheck size={18} className="text-red-400" />
+          <div>
+            <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/60 p-3.5 rounded-2xl flex items-center gap-3.5 max-w-xs shadow-xl">
+              <div className="w-9 h-9 rounded-xl bg-[#C61E1E]/30 border border-[#C61E1E]/50 flex items-center justify-center shrink-0">
+                <ShieldCheck size={19} className="text-red-400" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-200">Sistem Internal OJK</h4>
-                <p className="text-[11px] text-slate-400">Akses terbatas untuk pegawai berwenang</p>
+                <h4 className="text-xs font-bold text-slate-100">Sistem Internal OJK</h4>
+                <p className="text-[11px] text-slate-300 font-medium">Akses terbatas untuk pegawai berwenang</p>
               </div>
             </div>
           </div>
+
         </div>
 
-        {/* RIGHT SIDE: LOGIN FORM CARD & ABOUT US */}
-        <div className="lg:col-span-6 bg-slate-50 p-6 sm:p-8 lg:p-12 flex flex-col justify-between space-y-8">
+        {/* RIGHT SIDE: FLOATING WHITE LOGIN CARD */}
+        <div className="lg:col-span-5 flex justify-center lg:justify-end">
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-[36px] p-6 sm:p-8 shadow-2xl shadow-red-950/40 border border-white/90 relative overflow-hidden"
+          >
+            {/* Top Red Gradient Accent Line */}
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#C61E1E] via-red-500 to-[#C61E1E]" />
 
-          {/* LOGIN FORM CARD */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xl shadow-slate-200/50 space-y-6 relative overflow-hidden">
-            {/* Red Accent Top Bar */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#C61E1E] via-red-500 to-[#C61E1E]" />
-
-            {/* OJK Logo Header */}
+            {/* Header: Logo OJK Jabar & Welcome */}
             <div className="text-center space-y-2 pt-2">
               <div className="flex justify-center mb-2">
-                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 shadow-sm inline-flex items-center gap-2">
+                <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100 shadow-sm inline-flex items-center gap-2">
                   <Logo />
                 </div>
               </div>
               <p className="text-[11px] font-black text-[#C61E1E] uppercase tracking-widest">OTORITAS JASA KEUANGAN JAWA BARAT</p>
               <h2 className="text-2xl font-black text-slate-900 tracking-tight">Selamat Datang Kembali!</h2>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-slate-500 font-medium max-w-xs mx-auto">
                 Masuk untuk mengakses dashboard visualisasi data keuangan
               </p>
             </div>
 
             {/* Quick Login Admin Info Pill */}
-            <div className="bg-red-50/80 border border-red-100 p-3 rounded-2xl flex items-center justify-between gap-3">
+            <div className="my-5 bg-red-50/90 border border-red-100 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-full bg-[#C61E1E] text-white flex items-center justify-center font-extrabold text-xs shrink-0 shadow-sm">
                   DT
@@ -155,7 +167,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <button
                 type="button"
                 onClick={handleQuickAdminLogin}
-                className="bg-[#C61E1E] hover:bg-red-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-1 cursor-pointer"
+                className="bg-[#C61E1E] hover:bg-red-700 active:bg-red-800 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-1 cursor-pointer"
               >
                 <span>Masuk Admin</span>
                 <ChevronRight size={13} />
@@ -167,14 +179,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-semibold flex items-center gap-2"
+                className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-semibold flex items-center gap-2"
               >
                 <div className="w-2 h-2 rounded-full bg-red-600 shrink-0" />
                 <span>{error}</span>
               </motion.div>
             )}
 
-            {/* Form */}
+            {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* NIP / Email Input */}
               <div className="space-y-1.5">
@@ -245,7 +257,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-[#C61E1E] hover:bg-red-700 active:bg-red-800 text-white font-bold py-3.5 px-6 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-600/25 hover:shadow-red-600/40 transition-all duration-200 cursor-pointer disabled:opacity-75 mt-2"
+                className="w-full bg-[#C61E1E] hover:bg-red-700 active:bg-red-800 text-white font-bold py-3.5 px-6 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 hover:shadow-red-600/45 transition-all duration-200 cursor-pointer disabled:opacity-75 mt-2"
               >
                 {isSubmitting ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -257,39 +269,48 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 )}
               </button>
             </form>
-          </div>
 
-          {/* ABOUT US / TENTANG APLIKASI SECTION */}
-          <div className="bg-white/80 border border-slate-200/60 rounded-3xl p-5 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 text-slate-800">
-              <div className="p-1.5 bg-red-50 border border-red-100 rounded-xl text-[#C61E1E]">
-                <Info size={16} />
-              </div>
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Tentang Aplikasi (About Us)</h3>
+            {/* Toggle About Us Section */}
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={() => setShowAbout(!showAbout)}
+                className="w-full text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center gap-1.5 py-1 cursor-pointer transition-colors"
+              >
+                <Info size={13} className="text-[#C61E1E]" />
+                <span>{showAbout ? 'Sembunyikan Info Website' : 'Tentang Website Ini (About Us)'}</span>
+              </button>
+
+              {showAbout && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mt-3 p-4 bg-slate-50 border border-slate-200/70 rounded-2xl text-xs space-y-2 text-slate-600 leading-relaxed"
+                >
+                  <p>
+                    <strong>FINSIGHT OJK Jawa Barat</strong> adalah portal sistem visualisasi keuangan internal yang dirancang untuk pengolahan otomatis data perbankan regional (Aset, DPK, Kredit, NPL, CAR) dari file Excel.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 font-medium text-[10.5px]">
+                    <div className="flex items-center gap-1 text-slate-700">
+                      <CheckCircle2 size={12} className="text-[#C61E1E]" />
+                      <span>Parser Excel Otomatis</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-slate-700">
+                      <CheckCircle2 size={12} className="text-[#C61E1E]" />
+                      <span>Analisis Rasio & YoY</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed font-normal">
-              <strong>FINSIGHT OJK Jawa Barat</strong> adalah platform sistem visualisasi keuangan internal yang dirancang untuk mempercepat pengolahan dan analisis data perbankan regional (Aset, DPK, Kredit per Jenis, NPL, dan CAR) dari berkas Excel secara otomatis, presisi, dan terintegrasi.
-            </p>
-
-            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
-                <CheckCircle2 size={13} className="text-[#C61E1E]" />
-                <span>Parser Excel Otomatis</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
-                <CheckCircle2 size={13} className="text-[#C61E1E]" />
-                <span>Analisis Rasio & YoY</span>
-              </div>
+            {/* Footer Note */}
+            <div className="text-center text-[10.5px] text-slate-400 font-semibold pt-4 flex items-center justify-center gap-1.5">
+              <ShieldCheck size={13} className="text-slate-400" />
+              <span>Internal Staff Only — Protected by OJK Security</span>
             </div>
-          </div>
 
-          {/* Footer Note */}
-          <div className="text-center text-[11px] text-slate-400 font-medium pt-2 flex items-center justify-center gap-1.5">
-            <ShieldCheck size={14} className="text-slate-400" />
-            <span>Internal Staff Only — Protected by OJK Security</span>
-          </div>
-
+          </motion.div>
         </div>
 
       </div>
