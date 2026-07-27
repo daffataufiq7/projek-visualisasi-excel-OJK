@@ -57,7 +57,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         {/* LEFT SIDE: HERO BANNER & BUILDING MOCKUP */}
         <div className="lg:col-span-6 relative bg-gradient-to-br from-slate-900 via-slate-950 to-[#500a0a] p-8 lg:p-12 flex flex-col justify-between overflow-hidden min-h-[400px] lg:min-h-[640px]">
           {/* Subtle Grid Pattern Overlay */}
-          <div 
+          <div
             className="absolute inset-0 opacity-15 pointer-events-none"
             style={{
               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.2) 1px, transparent 0)`,
@@ -65,13 +65,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             }}
           />
 
-          {/* OJK Architectural Graphic Backdrop - Foto Kantor OJK Jabar */}
-          <div className="absolute inset-0 bg-cover bg-center opacity-45 mix-blend-overlay" style={{
+          {/* Foto Gedung Kantor Regional OJK Jawa Barat Asli */}
+          <div className="absolute inset-0 bg-cover bg-center opacity-65 transition-all duration-700" style={{
             backgroundImage: `url('/kantor_ojk.jpeg')`
           }} />
 
-          {/* Gradient Darkness Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
+          {/* Gradient Overlay untuk keterbacaan teks */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-950/20" />
 
           {/* Top Logo / Brand Pill */}
           <div className="relative z-10 flex items-center justify-between">
@@ -232,8 +232,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   />
                   <span className="text-xs font-semibold text-slate-600">Ingat saya</span>
                 </label>
-                <a 
-                  href="#" 
+                <a
+                  href="#"
                   onClick={(e) => { e.preventDefault(); alert('Silakan hubungi Administrator IT OJK Jawa Barat untuk me-reset password Anda.'); }}
                   className="text-xs font-bold text-[#C61E1E] hover:underline"
                 >
