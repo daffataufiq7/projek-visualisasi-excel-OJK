@@ -65,9 +65,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             }}
           />
 
-          {/* OJK Architectural Graphic Backdrop */}
-          <div className="absolute inset-0 bg-cover bg-center opacity-30 mix-blend-overlay" style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=1200&auto=format&fit=crop')`
+          {/* OJK Architectural Graphic Backdrop - Foto Kantor OJK Jabar */}
+          <div className="absolute inset-0 bg-cover bg-center opacity-45 mix-blend-overlay" style={{
+            backgroundImage: `url('/kantor_ojk.jpeg')`
           }} />
 
           {/* Gradient Darkness Overlay */}
