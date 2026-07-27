@@ -278,26 +278,60 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 className="w-full text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center gap-1.5 py-1 cursor-pointer transition-colors"
               >
                 <Info size={13} className="text-[#C61E1E]" />
-                <span>{showAbout ? 'Sembunyikan Info Website' : 'Tentang Website Ini (About Us)'}</span>
+                <span>{showAbout ? 'Sembunyikan Info Website' : 'Tentang Website & Tim Pengembang (About Us)'}</span>
               </button>
 
               {showAbout && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-3 p-4 bg-slate-50 border border-slate-200/70 rounded-2xl text-xs space-y-2 text-slate-600 leading-relaxed"
+                  className="mt-3 p-4 bg-slate-50 border border-slate-200/70 rounded-2xl text-xs space-y-4 text-slate-600 leading-relaxed max-h-[280px] overflow-y-auto"
                 >
-                  <p>
-                    <strong>FINSIGHT OJK Jawa Barat</strong> adalah portal sistem visualisasi keuangan internal yang dirancang untuk pengolahan otomatis data perbankan regional (Aset, DPK, Kredit, NPL, CAR) dari file Excel.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 font-medium text-[10.5px]">
-                    <div className="flex items-center gap-1 text-slate-700">
-                      <CheckCircle2 size={12} className="text-[#C61E1E]" />
-                      <span>Parser Excel Otomatis</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-slate-700">
-                      <CheckCircle2 size={12} className="text-[#C61E1E]" />
-                      <span>Analisis Rasio & YoY</span>
+                  <div className="space-y-1.5">
+                    <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#C61E1E]"></span>
+                      Informasi Aplikasi FINSIGHT
+                    </h4>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      <strong>FINSIGHT OJK Jawa Barat</strong> adalah sistem visualisasi keuangan internal yang dirancang untuk mempercepat pengolahan data perbankan regional (Aset, DPK, Kredit, NPL, CAR) dari file Excel secara otomatis, presisi, dan terintegrasi.
+                    </p>
+                  </div>
+
+                  {/* Tim Pengembang Aplikasi */}
+                  <div className="space-y-2 pt-2 border-t border-slate-200/60">
+                    <h4 className="text-[10.5px] font-black text-slate-800 uppercase tracking-wider text-center text-[#C61E1E]">
+                      TIM PENGEMBANG APLIKASI
+                    </h4>
+
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      {/* UNY */}
+                      <div className="bg-white p-2 rounded-xl border border-slate-200/60 flex flex-col items-center text-center">
+                        <img src="/uny_logo.png" alt="UNY" className="w-6 h-6 object-contain mb-1" />
+                        <span className="text-[10px] font-black text-slate-800">UNY</span>
+                        <div className="w-full border-t border-slate-100 mt-1 pt-1 text-[9px] font-semibold text-slate-600 space-y-0.5">
+                          <p>Daffa Taufiqurahman</p>
+                          <p>Naufal Hanif R.</p>
+                          <p>Angga Baihaki Y.</p>
+                        </div>
+                      </div>
+
+                      {/* ITB */}
+                      <div className="bg-white p-2 rounded-xl border border-slate-200/60 flex flex-col items-center text-center">
+                        <img src="/itb_logo.png" alt="ITB" className="w-6 h-6 object-contain mb-1" />
+                        <span className="text-[10px] font-black text-slate-800">ITB</span>
+                        <div className="w-full border-t border-slate-100 mt-1 pt-1 text-[9px] font-semibold text-slate-600 space-y-0.5">
+                          <p>Ratukhansa Salsabila</p>
+                        </div>
+                      </div>
+
+                      {/* Telkom Univ */}
+                      <div className="bg-white p-2 rounded-xl border border-slate-200/60 flex flex-col items-center text-center">
+                        <img src="/telkom_logo.png" alt="Telkom Univ" className="w-6 h-6 object-contain mb-1" />
+                        <span className="text-[10px] font-black text-slate-800">Telkom</span>
+                        <div className="w-full border-t border-slate-100 mt-1 pt-1 text-[9px] font-semibold text-slate-600 space-y-0.5">
+                          <p>Bunga Nazwa S.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
