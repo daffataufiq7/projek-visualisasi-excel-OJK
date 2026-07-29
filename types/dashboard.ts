@@ -61,6 +61,6 @@ export interface UploadHistoryItem {
   status: 'success' | 'failed';
   errorMessage?: string;
   fileData?: ActiveFile;
-  category?: string; // 'bank_umum' | 'kredit_jenis' | 'dpk_portofolio'
+  category?: string; // 'bank_umum' | 'kredit_jenis' | 'dpk_portofolio' | 'undisbursed_loan'
   isSample?: boolean;
 }

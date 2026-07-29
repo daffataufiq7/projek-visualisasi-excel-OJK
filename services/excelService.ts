@@ -624,6 +624,30 @@ export function generateMockFile(): ActiveFile {
   };
 }
 
+// Download template khusus Undisbursed Loan
+export function downloadUndisbursedLoanTemplate(): void {
+  const wb = XLSX.utils.book_new();
+  
+  const headersRow1 = ['Undisbursed Loan', 2024, 2025, 2026, '', ''];
+  const headersRow2 = ['', 'Mei', 'Mei', 'Mei', 'YOY', 'SHARE'];
+  const dataRow1 = ['Modal Kerja', 351393161049054, 338810328055006, 329740604279539, -0.0268, 0.3052];
+  const dataRow2 = ['Investasi', 190762844685500, 216723091364230, 251790742742739, 0.1618, 0.2330];
+  const dataRow3 = ['Konsumsi', 442899398544257, 474957031024500, 499029032369175, 0.0507, 0.4618];
+  const dataRow4 = ['Total', 985055404278811, 1030490450443740, 1080560379391450, 0.0486, 1.0000];
+
+  const ws = XLSX.utils.aoa_to_sheet([
+    headersRow1,
+    headersRow2,
+    dataRow1,
+    dataRow2,
+    dataRow3,
+    dataRow4
+  ]);
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Undisbursed Loan');
+  XLSX.writeFile(wb, 'Template_Undisbursed_Loan_OJK.xlsx');
+}
+
 // Download template khusus Kredit per Jenis Penggunaan
 export function downloadKreditJenisTemplate(): void {
   const wb = XLSX.utils.book_new();
