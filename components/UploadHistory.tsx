@@ -8,6 +8,7 @@ interface UploadHistoryProps {
   history: UploadHistoryItem[];
   onLoadItem: (id: string) => void;
   onDeleteItem: (id: string) => void;
+  onClearAllHistory?: () => void;
   activeFileName?: string;
 }
 
@@ -15,6 +16,7 @@ export default function UploadHistory({
   history,
   onLoadItem,
   onDeleteItem,
+  onClearAllHistory,
   activeFileName
 }: UploadHistoryProps) {
   
@@ -35,16 +37,35 @@ export default function UploadHistory({
     }
   };
 
+  const hasUserUploads = history.some(h => !h.isSample && !h.id.startsWith('default-mock'));
+
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-6 space-y-6 w-full">
-      <div className="flex items-center gap-2 border-b border-slate-50 pb-4">
-        <History size={18} className="text-[#C61E1E]" />
-        <div>
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Riwayat Unggahan Dokumen</h3>
-          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-            Daftar file Excel yang tersimpan di penyimpanan lokal penjelajah
-          </p>
+      <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+        <div className="flex items-center gap-2">
+          <History size={18} className="text-[#C61E1E]" />
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Riwayat Unggahan Dokumen</h3>
+            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+              Daftar file Excel yang tersimpan di penyimpanan lokal penjelajah
+            </p>
+          </div>
         </div>
+
+        {onClearAllHistory && hasUserUploads && (
+          <button
+            onClick={() => {
+              if (confirm('Apakah Anda yakin ingin menghapus seluruh riwayat upload pengguna dan menyisakan data sampel saja?')) {
+                onClearAllHistory();
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 text-[#C61E1E] hover:bg-[#C61E1E] hover:text-white border border-red-100 text-xs font-bold transition-all shadow-sm"
+            title="Kosongkan seluruh riwayat upload pengguna"
+          >
+            <Trash2 size={14} />
+            <span>Kosongkan Riwayat</span>
+          </button>
+        )}
       </div>
 
       {history.length === 0 ? (
@@ -70,7 +91,7 @@ export default function UploadHistory({
             <tbody className="divide-y divide-slate-50">
               {history.map((item) => {
                 const isActive = activeFileName === item.name;
-                const isDefault = item.id === 'default-mock';
+                const isDefault = Boolean(item.isSample || item.id.startsWith('default-mock'));
 
                 return (
                   <tr 
@@ -147,7 +168,11 @@ export default function UploadHistory({
 
                         {/* 3. Hapus */}
                         <button
-                          onClick={() => onDeleteItem(item.id)}
+                          onClick={() => {
+                            if (confirm(`Apakah Anda yakin ingin menghapus "${item.name}" dari riwayat?`)) {
+                              onDeleteItem(item.id);
+                            }
+                          }}
                           className={`p-1.5 border rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold ${
                             isDefault 
                               ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed' 

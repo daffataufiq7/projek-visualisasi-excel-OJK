@@ -80,6 +80,10 @@ export default function UndisbursedLoanView({ activeFile }: UndisbursedLoanViewP
       );
       if (key) sheet = activeFile?.sheets[key];
     }
+    if (!sheet && activeFile?.sheets && Object.keys(activeFile.sheets).length > 0) {
+      const firstKey = Object.keys(activeFile.sheets)[0];
+      if (firstKey) sheet = activeFile.sheets[firstKey];
+    }
 
     if (sheet) {
       return {

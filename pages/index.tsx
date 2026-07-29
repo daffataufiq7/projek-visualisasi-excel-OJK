@@ -45,6 +45,7 @@ export default function Home() {
     setSidebarCollapsed,
     handleUpload,
     deleteHistoryItem,
+    clearAllHistory,
     loadHistoryItem,
     setFilterState,
     handleSheetChange,
@@ -222,6 +223,7 @@ export default function Home() {
               history={history.filter(h => h.category === 'bank_umum')}
               onLoadItem={(id) => loadHistoryItem(id, 'bank_umum')}
               onDeleteItem={deleteHistoryItem}
+              onClearAllHistory={() => clearAllHistory('bank_umum')}
               activeFileName={activeFile?.name}
             />
           </motion.div>
@@ -234,6 +236,7 @@ export default function Home() {
               history={history.filter(h => h.category === 'kredit_jenis')}
               onLoadItem={(id) => loadHistoryItem(id, 'kredit_jenis')}
               onDeleteItem={deleteHistoryItem}
+              onClearAllHistory={() => clearAllHistory('kredit_jenis')}
               activeFileName={activeFile?.name}
             />
           </motion.div>
@@ -246,6 +249,7 @@ export default function Home() {
               history={history.filter(h => h.category === 'dpk_portofolio')}
               onLoadItem={(id) => loadHistoryItem(id, 'dpk_portofolio')}
               onDeleteItem={deleteHistoryItem}
+              onClearAllHistory={() => clearAllHistory('dpk_portofolio')}
               activeFileName={activeFile?.name}
             />
           </motion.div>
@@ -258,6 +262,7 @@ export default function Home() {
               history={history.filter(h => h.category === 'undisbursed_loan')}
               onLoadItem={(id) => loadHistoryItem(id, 'undisbursed_loan')}
               onDeleteItem={deleteHistoryItem}
+              onClearAllHistory={() => clearAllHistory('undisbursed_loan')}
               activeFileName={activeFile?.name}
             />
           </motion.div>

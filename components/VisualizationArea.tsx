@@ -116,7 +116,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
   const [showZoom, setShowZoom] = useState(false);
   const [unitType, setUnitType] = useState<'raw' | 'thousand' | 'million' | 'billion' | 'trillion' | 'auto'>('auto');
 
-  const activeSheetData = activeFile.sheets[filterState.sheet] || activeFile.sheets[activeFile.activeSheetName];
+  const activeSheetData = activeFile.sheets[filterState.sheet] || activeFile.sheets[activeFile.activeSheetName] || activeFile.sheets[activeFile.sheetNames[0]];
 
   // Filter yAxis to ONLY contain indicators that belong to activeSheetData AND have at least 1 non-zero value
   const activeYAxis = useMemo(() => {

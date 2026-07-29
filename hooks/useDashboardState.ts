@@ -10,6 +10,27 @@ import {
 
 const LOCAL_STORAGE_HISTORY_KEY = 'finsight_upload_history';
 const LOCAL_STORAGE_ACTIVE_IDS_KEY = 'finsight_active_file_ids';
+const LOCAL_STORAGE_DELETED_IDS_KEY = 'finsight_deleted_file_ids';
+
+const getDeletedIds = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_IDS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+const recordDeletedId = (id: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getDeletedIds();
+    if (!current.includes(id)) {
+      localStorage.setItem(LOCAL_STORAGE_DELETED_IDS_KEY, JSON.stringify([...current, id]));
+    }
+  } catch (e) {}
+};
 
 export function useDashboardState() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -78,11 +99,16 @@ export function useDashboardState() {
       sheet: '', year: 'All', month: 'All', xAxis: 'period', yAxis: [], chartType: 'bar',
       selectedYears: [], selectedMonths: []
     },
+    undisbursed_loan: {
+      sheet: '', year: 'All', month: 'All', xAxis: 'period', yAxis: [], chartType: 'bar',
+      selectedYears: [], selectedMonths: []
+    },
   });
 
   const getActiveCategory = (tab: string) => {
     if (tab.startsWith('kredit_jenis')) return 'kredit_jenis';
     if (tab.startsWith('dpk_portofolio')) return 'dpk_portofolio';
+    if (tab.startsWith('undisbursed_loan')) return 'undisbursed_loan';
     return 'bank_umum';
   };
 
@@ -174,19 +200,22 @@ export function useDashboardState() {
       const res = await fetch('/api/data');
       if (res.ok) {
         const data = await res.json();
-        const serverHistory = data.history || [];
+        const serverHistory: UploadHistoryItem[] = data.history || [];
         const serverActiveFileIds = data.activeFileIds || {};
+
+        const deletedIds = getDeletedIds();
+        const isNotDeleted = (h: any) => h && h.id && !deletedIds.includes(h.id);
 
         // Read local user uploads from IndexedDB & localStorage
         const dbItems = await loadHistoryFromDB();
         const storedLocalHistoryRaw = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
-        let localUserUploads: UploadHistoryItem[] = dbItems.filter((h: any) => !h.isSample);
+        let localUserUploads: UploadHistoryItem[] = dbItems.filter((h: any) => !h.isSample && isNotDeleted(h));
 
         if (storedLocalHistoryRaw) {
           try {
             const parsed = JSON.parse(storedLocalHistoryRaw) as UploadHistoryItem[];
             const lsUploads = parsed.filter(
-              h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed'
+              h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed' && isNotDeleted(h)
             );
             lsUploads.forEach(item => {
               if (!localUserUploads.some(d => d.id === item.id)) {
@@ -197,13 +226,22 @@ export function useDashboardState() {
         }
 
         const cleanedServerHistory = serverHistory.filter(
-          (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed'
+          (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed' && isNotDeleted(h)
         );
+
+        // Map existing fileData from memory & IndexedDB to prevent losing parsed Excel files
+        const fileDataMap = new Map<string, ActiveFile>();
+        dbItems.forEach((h: any) => { if (h?.id && h?.fileData) fileDataMap.set(h.id, h.fileData); });
+        history.forEach(h => { if (h?.id && h?.fileData) fileDataMap.set(h.id, h.fileData); });
 
         // Merge local user uploads with server history (local uploads take precedence)
         const mergedUserHistoryMap = new Map<string, UploadHistoryItem>();
         [...cleanedServerHistory, ...localUserUploads].forEach(item => {
-          if (item && item.id) {
+          if (item && item.id && isNotDeleted(item)) {
+            // Restore fileData if missing from JSON server response
+            if (!item.fileData && fileDataMap.has(item.id)) {
+              item.fileData = fileDataMap.get(item.id)!;
+            }
             mergedUserHistoryMap.set(item.id, item);
           }
         });
@@ -259,6 +297,11 @@ export function useDashboardState() {
         yAxis: [], chartType: 'bar',
         selectedYears: [], selectedMonths: []
       },
+      undisbursed_loan: {
+        sheet: 'Undisbursed Loan', year: 'All', month: 'All', xAxis: 'period',
+        yAxis: [], chartType: 'bar',
+        selectedYears: [], selectedMonths: []
+      },
     });
 
     // Load active file IDs from IndexedDB / localStorage
@@ -305,7 +348,7 @@ export function useDashboardState() {
   // Auto-populate filterState.yAxis (select all indicators) whenever the active file changes
   // This handles: server sync switching activeFileIds, loadHistoryItem, and initial load
   useEffect(() => {
-    const categories = ['bank_umum', 'kredit_jenis', 'dpk_portofolio'] as const;
+    const categories = ['bank_umum', 'kredit_jenis', 'dpk_portofolio', 'undisbursed_loan'] as const;
     setFilterStates(prev => {
       let changed = false;
       const next = { ...prev };
@@ -479,16 +522,22 @@ export function useDashboardState() {
 
   // Delete History Item
   const deleteHistoryItem = async (id: string) => {
-    if (id === 'default-mock-bank' || id === 'default-mock-kredit' || id === 'default-mock-dpk' || id === 'default-mock-undisbursed') {
+    const targetItem = history.find(h => h.id === id);
+    if (id.startsWith('default-mock') || targetItem?.isSample) {
       alert('File sampel default tidak dapat dihapus');
       return;
     }
-    const targetItem = history.find(h => h.id === id);
-    const category = targetItem?.category || 'bank_umum';
 
+    recordDeletedId(id);
+
+    const category = targetItem?.category || 'bank_umum';
     const updatedHistory = history.filter(item => item.id !== id);
+
     setHistory(updatedHistory);
-    localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+    saveHistoryToDB(updatedHistory);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+    } catch (e) {}
 
     try {
       await fetch('/api/data', {
@@ -507,7 +556,10 @@ export function useDashboardState() {
         [category]: defaultId
       };
       setActiveFileIds(newActive);
-      localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
+      saveActiveIdsToDB(newActive);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
+      } catch (e) {}
 
       const mockItem = updatedHistory.find(h => h.id === defaultId);
       if (mockItem && mockItem.fileData) {
@@ -532,24 +584,37 @@ export function useDashboardState() {
 
   // Load File from History
   const loadHistoryItem = async (id: string, redirectTab: string = 'bank_umum') => {
-    const item = history.find(h => h.id === id);
+    let item = history.find(h => h.id === id);
+    if (item && !item.fileData) {
+      const dbItems = await loadHistoryFromDB();
+      const dbFound = dbItems.find((h: any) => h.id === id);
+      if (dbFound && dbFound.fileData) {
+        item = dbFound;
+      }
+    }
+
     if (item && item.status === 'success' && item.fileData) {
       const file = item.fileData;
       const sheet = file.sheetNames[0];
+      const category = item.category || redirectTab;
 
       const newActive = {
         ...activeFileIds,
+        [category]: id,
         [redirectTab]: id
       };
       setActiveFileIds(newActive);
-      localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
+      saveActiveIdsToDB(newActive);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
+      } catch (e) {}
 
       try {
         await fetch('/api/data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            activeFileIds: { [redirectTab]: id }
+            activeFileIds: { [category]: id, [redirectTab]: id }
           })
         });
       } catch (err) {
@@ -558,6 +623,17 @@ export function useDashboardState() {
 
       setFilterStates(prev => ({
         ...prev,
+        [category]: {
+          sheet,
+          year: 'All',
+          month: 'All',
+          xAxis: 'period',
+          yAxis: file.sheets[sheet]?.indicators || [],
+          chartType: 'bar',
+          overlayRatio: false,
+          selectedYears: [],
+          selectedMonths: [],
+        },
         [redirectTab]: {
           sheet,
           year: 'All',
@@ -592,6 +668,55 @@ export function useDashboardState() {
     });
   };
 
+  // Clear All User History
+  const clearAllHistory = async (category?: string) => {
+    // Record all non-sample IDs as deleted
+    history.forEach(h => {
+      if (!h.isSample && !h.id.startsWith('default-mock') && (!category || h.category === category)) {
+        recordDeletedId(h.id);
+      }
+    });
+
+    let updatedHistory: UploadHistoryItem[];
+    if (category) {
+      updatedHistory = history.filter(h => h.isSample || h.id.startsWith('default-mock') || h.category !== category);
+    } else {
+      updatedHistory = history.filter(h => h.isSample || h.id.startsWith('default-mock'));
+    }
+
+    setHistory(updatedHistory);
+    await saveHistoryToDB(updatedHistory);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+    } catch (e) {}
+
+    const categoriesToReset = category ? [category] : ['bank_umum', 'kredit_jenis', 'dpk_portofolio', 'undisbursed_loan'];
+    const newActive = { ...activeFileIds };
+    categoriesToReset.forEach(cat => {
+      const defaultId = cat === 'kredit_jenis' ? 'default-mock-kredit'
+        : cat === 'dpk_portofolio' ? 'default-mock-dpk'
+        : cat === 'undisbursed_loan' ? 'default-mock-undisbursed'
+        : 'default-mock-bank';
+      newActive[cat] = defaultId;
+    });
+
+    setActiveFileIds(newActive);
+    await saveActiveIdsToDB(newActive);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
+    } catch (e) {}
+
+    try {
+      await fetch('/api/data', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clearAll: true, category })
+      });
+    } catch (err) {
+      console.warn('Failed to sync clearAll to server API:', err);
+    }
+  };
+
   return {
     isAuthenticated,
     currentUser,
@@ -610,6 +735,7 @@ export function useDashboardState() {
     setSidebarCollapsed,
     handleUpload,
     deleteHistoryItem,
+    clearAllHistory,
     loadHistoryItem,
     setFilterState,
     handleSheetChange,

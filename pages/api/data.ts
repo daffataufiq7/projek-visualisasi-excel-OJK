@@ -16,6 +16,7 @@ let serverState: {
     bank_umum: 'default-mock-bank',
     kredit_jenis: 'default-mock-kredit',
     dpk_portofolio: 'default-mock-dpk',
+    undisbursed_loan: 'default-mock-undisbursed',
   },
   history: []
 };
@@ -85,9 +86,43 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   if (req.method === 'DELETE') {
-    const { id } = req.body || {};
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch(e){}
+    }
+    const { id, clearAll, category } = body || {};
+
+    if (clearAll) {
+      if (category) {
+        serverState.history = serverState.history.filter((h: any) => h.category !== category);
+        const defaultId = category === 'kredit_jenis' ? 'default-mock-kredit'
+          : category === 'dpk_portofolio' ? 'default-mock-dpk'
+          : category === 'undisbursed_loan' ? 'default-mock-undisbursed'
+          : 'default-mock-bank';
+        serverState.activeFileIds[category] = defaultId;
+      } else {
+        serverState.history = [];
+        serverState.activeFileIds = {
+          bank_umum: 'default-mock-bank',
+          kredit_jenis: 'default-mock-kredit',
+          dpk_portofolio: 'default-mock-dpk',
+          undisbursed_loan: 'default-mock-undisbursed',
+        };
+      }
+      saveToFile();
+      return res.status(200).json(serverState);
+    }
+
     if (id) {
-      serverState.history = serverState.history.filter(h => h.id !== id);
+      serverState.history = serverState.history.filter((h: any) => h.id !== id);
+      Object.keys(serverState.activeFileIds).forEach(cat => {
+        if (serverState.activeFileIds[cat] === id) {
+          serverState.activeFileIds[cat] = cat === 'kredit_jenis' ? 'default-mock-kredit'
+            : cat === 'dpk_portofolio' ? 'default-mock-dpk'
+            : cat === 'undisbursed_loan' ? 'default-mock-undisbursed'
+            : 'default-mock-bank';
+        }
+      });
       saveToFile();
     }
     return res.status(200).json(serverState);
