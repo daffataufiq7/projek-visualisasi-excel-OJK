@@ -423,30 +423,26 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                 return isNominal && n.includes('kredit');
               });
 
-              let anchorMax: number;
+              let anchorValue: number;
               if (kreditIndicator) {
-                // Use Kredit bar's max value (already in unitSpec.factor scale) as anchor
+                // Use the Kredit bar value for THIS specific data point (not max),
+                // then multiply by 0.5 so the dot sits at the MIDPOINT of the blue bar.
                 const kreditIdx = activeSheetData.indicators.indexOf(kreditIndicator);
                 const kreditKey = `ind_${kreditIdx}`;
-                let kreditMax = 0;
-                filteredData.forEach((fd) => {
-                  const v = Math.abs(Number(fd[kreditKey]) || 0) / unitSpec.factor;
-                  if (v > kreditMax) kreditMax = v;
-                });
-                anchorMax = kreditMax || leftMax;
+                const kreditVal = Math.abs(Number(d[kreditKey]) || 0) / unitSpec.factor;
+                // NPL is index 0 → sits at 50% of bar height
+                // LDR is index 1 → sits at 45% of bar height (slightly lower to avoid overlap)
+                const midRatio = 0.50 - pctIdx * 0.05;
+                anchorValue = kreditVal * midRatio;
               } else {
                 // Fallback: use leftMax * targetRatio (original behaviour)
                 const targetRatio = Math.max(0.15, 0.50 - pctIdx * 0.15);
-                anchorMax = leftMax * targetRatio;
+                anchorValue = leftMax * targetRatio;
               }
-
-              // Shift each pct indicator slightly below the anchor to avoid overlap
-              const stackOffset = Math.max(0.05, 0.10 - pctIdx * 0.05);
-              const finalAnchor = anchorMax * (1 - stackOffset * pctIdx);
 
               const indMax = indicatorMaxMap[safeKey];
               const scaledMax = isDec ? indMax * 100 : indMax;
-              newD[safeKey] = parseFloat(((origVal / (scaledMax || 1)) * finalAnchor).toFixed(2));
+              newD[safeKey] = parseFloat(((origVal / (scaledMax || 1)) * anchorValue).toFixed(2));
             } else {
               newD[safeKey] = origVal;
             }
