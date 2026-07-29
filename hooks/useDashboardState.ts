@@ -56,6 +56,7 @@ export function useDashboardState() {
     bank_umum: 'default-mock-bank',
     kredit_jenis: 'default-mock-kredit',
     dpk_portofolio: 'default-mock-dpk',
+    undisbursed_loan: 'default-mock-undisbursed',
   });
   const [history, setHistory] = useState<UploadHistoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -149,7 +150,21 @@ export function useDashboardState() {
       isSample: true,
     };
 
-    return [initialHistoryBankUmum, initialHistoryKredit, initialHistoryDpk];
+    const mockUndisbursedFile = { ...mockFile, name: 'Data Sampel Undisbursed Loan.xlsx', isSample: true };
+    const initialHistoryUndisbursed: UploadHistoryItem = {
+      id: 'default-mock-undisbursed',
+      name: mockUndisbursedFile.name,
+      size: mockUndisbursedFile.size,
+      sheetCount: mockUndisbursedFile.sheetNames.length,
+      rowCount: mockUndisbursedFile.rowCount,
+      uploadDate: mockUndisbursedFile.uploadDate,
+      status: 'success',
+      fileData: mockUndisbursedFile,
+      category: 'undisbursed_loan',
+      isSample: true,
+    };
+
+    return [initialHistoryBankUmum, initialHistoryKredit, initialHistoryDpk, initialHistoryUndisbursed];
   }, []);
 
   // Sync with Server API (/api/data) to align Localhost & Ngrok users in real-time,
@@ -171,7 +186,7 @@ export function useDashboardState() {
           try {
             const parsed = JSON.parse(storedLocalHistoryRaw) as UploadHistoryItem[];
             const lsUploads = parsed.filter(
-              h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
+              h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed'
             );
             lsUploads.forEach(item => {
               if (!localUserUploads.some(d => d.id === item.id)) {
@@ -182,7 +197,7 @@ export function useDashboardState() {
         }
 
         const cleanedServerHistory = serverHistory.filter(
-          (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
+          (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed'
         );
 
         // Merge local user uploads with server history (local uploads take precedence)
@@ -464,7 +479,7 @@ export function useDashboardState() {
 
   // Delete History Item
   const deleteHistoryItem = async (id: string) => {
-    if (id === 'default-mock-bank' || id === 'default-mock-kredit' || id === 'default-mock-dpk') {
+    if (id === 'default-mock-bank' || id === 'default-mock-kredit' || id === 'default-mock-dpk' || id === 'default-mock-undisbursed') {
       alert('File sampel default tidak dapat dihapus');
       return;
     }
@@ -486,7 +501,7 @@ export function useDashboardState() {
     }
 
     if (activeFileIds[category] === id) {
-      const defaultId = category === 'kredit_jenis' ? 'default-mock-kredit' : category === 'dpk_portofolio' ? 'default-mock-dpk' : 'default-mock-bank';
+      const defaultId = category === 'kredit_jenis' ? 'default-mock-kredit' : category === 'dpk_portofolio' ? 'default-mock-dpk' : category === 'undisbursed_loan' ? 'default-mock-undisbursed' : 'default-mock-bank';
       const newActive = {
         ...activeFileIds,
         [category]: defaultId

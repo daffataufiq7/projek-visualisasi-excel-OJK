@@ -18,6 +18,7 @@ import {
   Building2,
   CreditCard,
   Wallet,
+  BarChart2,
   LogOut
 } from 'lucide-react';
 import Logo from './Logo';
@@ -73,6 +74,15 @@ export default function Layout({
       subItems: [
         { id: 'dpk_portofolio_upload', name: 'Upload Excel', icon: UploadCloud },
         { id: 'dpk_portofolio_history', name: 'Riwayat Upload', icon: History }
+      ]
+    },
+    { 
+      id: 'undisbursed_loan', 
+      name: 'Undisbursed Loan', 
+      icon: BarChart2,
+      subItems: [
+        { id: 'undisbursed_loan_upload', name: 'Upload Excel', icon: UploadCloud },
+        { id: 'undisbursed_loan_history', name: 'Riwayat Upload', icon: History }
       ]
     },
     { id: 'template', name: 'Download Template', icon: FileSpreadsheet },
