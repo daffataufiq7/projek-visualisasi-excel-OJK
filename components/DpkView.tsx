@@ -1188,12 +1188,23 @@ export default function DpkView({ activeFile }: DpkViewProps) {
                     contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '12px' }}
                   />
                   <Bar dataKey="yoyPct" radius={[0, 4, 4, 0]}>
-                    {yoyComparisonData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-yoy-${index}`} 
-                        fill={entry.category === 'TOTAL DPK' ? '#C61E1E' : entry.isPositive ? '#10B981' : '#EF4444'} 
-                      />
-                    ))}
+                    {yoyComparisonData.map((entry, index) => {
+                      let color = COLORS[entry.category];
+                      if (!color) {
+                        const cat = entry.category.toLowerCase();
+                        if (cat.includes('giro')) color = '#6366F1'; // Indigo
+                        else if (cat.includes('tabungan')) color = '#10B981'; // Emerald Green
+                        else if (cat.includes('deposito')) color = '#F59E0B'; // Amber
+                        else if (cat.includes('total')) color = '#C61E1E'; // Red OJK
+                        else color = PIE_COLORS[index % PIE_COLORS.length];
+                      }
+                      return (
+                        <Cell 
+                          key={`cell-yoy-${index}`} 
+                          fill={color} 
+                        />
+                      );
+                    })}
                     {showChartLabels && (
                       <LabelList 
                         dataKey="yoyPct" 
