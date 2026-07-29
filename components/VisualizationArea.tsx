@@ -82,7 +82,7 @@ const CustomizedLineLabel = (props: any) => {
     }
   }
 
-  const formattedVal = `${displayVal.toLocaleString('id-ID')}%`;
+  const formattedVal = typeof displayVal === 'number' ? `${displayVal.toFixed(2)}%` : `${displayVal}%`;
   const colors = getLabelColors(stroke);
 
   return (
@@ -383,69 +383,11 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
           if (isPercent) {
             // Convert to percentage scale if decimal-scaled
             const isDec = isDecimalScaledMap[indicator];
-            const origVal = isDec ? parseFloat((d[safeKey] * 100).toFixed(2)) : d[safeKey];
+            const origVal = isDec ? parseFloat((d[safeKey] * 100).toFixed(2)) : parseFloat(d[safeKey].toFixed(2));
             
-            // Store original percentage value
+            // Store original percentage value and use real percentage value for charting
             newD[`${safeKey}_original`] = origVal;
-            
-            if (filterState.overlayRatio) {
-              // Find index of this percentage indicator among all selected percentage indicators
-              const pctIndicators = activeYAxis.filter((ind) => {
-                const name = ind.toLowerCase();
-                return (
-                  name.includes('npl') || 
-                  name.includes('ldr') || 
-                  name.includes('car') || 
-                  name.includes('roa') || 
-                  name.includes('roe') || 
-                  name.includes('nim') || 
-                  name.includes('bopo') || 
-                  name.includes('%') || 
-                  name.includes('rasio') || 
-                  name.includes('ratio') || 
-                  name.includes('pertumbuhan') || 
-                  name.includes('growth') || 
-                  name.includes('rate')
-                );
-              });
-              const pctIdx = pctIndicators.indexOf(indicator);
-
-              // Anchor NPL/LDR lines to Kredit bar height.
-              // Find the Kredit indicator among active nominal indicators and use its max value.
-              const kreditIndicator = activeYAxis.find((ind) => {
-                const n = ind.toLowerCase();
-                const isNominal = !(
-                  n.includes('npl') || n.includes('ldr') || n.includes('car') ||
-                  n.includes('roa') || n.includes('roe') || n.includes('nim') ||
-                  n.includes('bopo') || n.includes('%') || n.includes('rasio') ||
-                  n.includes('ratio') || n.includes('pertumbuhan') || n.includes('growth') || n.includes('rate')
-                );
-                return isNominal && n.includes('kredit');
-              });
-
-              let anchorValue: number;
-              if (kreditIndicator) {
-                // Use the Kredit bar value for THIS specific data point (not max),
-                // then multiply by 0.5 so the dot sits at the MIDPOINT of the blue bar.
-                const kreditIdx = activeSheetData.indicators.indexOf(kreditIndicator);
-                const kreditKey = `ind_${kreditIdx}`;
-                const kreditVal = Math.abs(Number(d[kreditKey]) || 0) / unitSpec.factor;
-                // NPL is index 0 → sits at 50% of bar height
-                // LDR is index 1 → sits at 45% of bar height (slightly lower to avoid overlap)
-                const midRatio = 0.50 - pctIdx * 0.05;
-                anchorValue = kreditVal * midRatio;
-              } else {
-                // Fallback: use leftMax * targetRatio (original behaviour)
-                const targetRatio = Math.max(0.15, 0.50 - pctIdx * 0.15);
-                anchorValue = leftMax * targetRatio;
-              }
-
-              const indMax = indicatorMaxMap[safeKey];
-              const scaledMax = isDec ? indMax * 100 : indMax;
-              newD[safeKey] = parseFloat(((origVal / (scaledMax || 1)) * anchorValue).toFixed(2));
-            } else {
-              newD[safeKey] = origVal;
-            }
+            newD[safeKey] = origVal;
           } else {
             const scaled = d[safeKey] / unitSpec.factor;
             newD[safeKey] = parseFloat(scaled.toFixed(2));
@@ -766,13 +708,25 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
           <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} axisLine={false} tickLine={false} />
           
-          {/* Left Y Axis for all elements (nominal bars and normalized percentage lines) */}
+          {/* Left Y Axis for Nominal Bars */}
           <YAxis 
             yAxisId="left" 
             stroke="#64748B" 
             tick={{ fontSize: 10, fill: '#64748B', fontWeight: 500 }} 
             axisLine={false} 
+            tickLine={false}
+            tickFormatter={(val: any) => formatCurrencyLabel(val)}
+          />
+
+          {/* Right Y Axis for Percentage Lines (NPL, LDR, CAR, etc.) */}
+          <YAxis 
+            yAxisId="right" 
+            orientation="right"
+            stroke="#FF7300" 
+            tick={{ fontSize: 10, fill: '#FF7300', fontWeight: 700 }} 
+            axisLine={false} 
             tickLine={false} 
+            tickFormatter={(val: any) => `${val}%`}
           />
           
           <Tooltip content={<CustomTooltip />} />
@@ -822,7 +776,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
             return null;
           })}
 
-          {/* Second, render all Line components (percentage indicators) so they are drawn ON TOP of the bars */}
+          {/* Second, render all Line components (percentage indicators) using Right Y Axis */}
           {activeYAxis.map((indicator) => {
             const indIdx = activeSheetData.indicators.indexOf(indicator);
             const safeKey = `ind_${indIdx}`;
@@ -850,9 +804,9 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                   name={indicator}
                   type="monotone"
                   dataKey={safeKey}
-                  yAxisId="left"
+                  yAxisId="right"
                   stroke={getIndicatorColor(indicator, indIdx)}
-                  strokeWidth={2.5}
+                  strokeWidth={3}
                   activeDot={{ r: 6, strokeWidth: 0 }}
                   dot={{ r: 4, strokeWidth: 1 }}
                   connectNulls={true}
