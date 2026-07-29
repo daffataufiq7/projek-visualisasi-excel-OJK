@@ -409,14 +409,44 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
                 );
               });
               const pctIdx = pctIndicators.indexOf(indicator);
-              
-              // Shift the target peak height slightly depending on its index to avoid overlap
-              // Index 0 peaks at leftMax * 0.50, Index 1 at leftMax * 0.35, etc.
-              const targetRatio = Math.max(0.15, 0.50 - pctIdx * 0.15);
+
+              // Anchor NPL/LDR lines to Kredit bar height.
+              // Find the Kredit indicator among active nominal indicators and use its max value.
+              const kreditIndicator = activeYAxis.find((ind) => {
+                const n = ind.toLowerCase();
+                const isNominal = !(
+                  n.includes('npl') || n.includes('ldr') || n.includes('car') ||
+                  n.includes('roa') || n.includes('roe') || n.includes('nim') ||
+                  n.includes('bopo') || n.includes('%') || n.includes('rasio') ||
+                  n.includes('ratio') || n.includes('pertumbuhan') || n.includes('growth') || n.includes('rate')
+                );
+                return isNominal && n.includes('kredit');
+              });
+
+              let anchorMax: number;
+              if (kreditIndicator) {
+                // Use Kredit bar's max value (already in unitSpec.factor scale) as anchor
+                const kreditIdx = activeSheetData.indicators.indexOf(kreditIndicator);
+                const kreditKey = `ind_${kreditIdx}`;
+                let kreditMax = 0;
+                filteredData.forEach((fd) => {
+                  const v = Math.abs(Number(fd[kreditKey]) || 0) / unitSpec.factor;
+                  if (v > kreditMax) kreditMax = v;
+                });
+                anchorMax = kreditMax || leftMax;
+              } else {
+                // Fallback: use leftMax * targetRatio (original behaviour)
+                const targetRatio = Math.max(0.15, 0.50 - pctIdx * 0.15);
+                anchorMax = leftMax * targetRatio;
+              }
+
+              // Shift each pct indicator slightly below the anchor to avoid overlap
+              const stackOffset = Math.max(0.05, 0.10 - pctIdx * 0.05);
+              const finalAnchor = anchorMax * (1 - stackOffset * pctIdx);
 
               const indMax = indicatorMaxMap[safeKey];
               const scaledMax = isDec ? indMax * 100 : indMax;
-              newD[safeKey] = parseFloat(((origVal / (scaledMax || 1)) * (leftMax * targetRatio)).toFixed(2));
+              newD[safeKey] = parseFloat(((origVal / (scaledMax || 1)) * finalAnchor).toFixed(2));
             } else {
               newD[safeKey] = origVal;
             }
