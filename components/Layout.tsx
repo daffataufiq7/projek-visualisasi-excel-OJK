@@ -75,15 +75,6 @@ export default function Layout({
         { id: 'dpk_portofolio_history', name: 'Riwayat Upload', icon: History }
       ]
     },
-    { 
-      id: 'undisbursed_loan', 
-      name: 'Undisbursed Loan', 
-      icon: FileSpreadsheet,
-      subItems: [
-        { id: 'undisbursed_loan_upload', name: 'Upload Excel', icon: UploadCloud },
-        { id: 'undisbursed_loan_history', name: 'Riwayat Upload', icon: History }
-      ]
-    },
     { id: 'template', name: 'Download Template', icon: FileSpreadsheet },
     { id: 'pengaturan', name: 'Pengaturan', icon: Settings },
     { id: 'tentang', name: 'Tentang', icon: Info },

@@ -56,7 +56,6 @@ export function useDashboardState() {
     bank_umum: 'default-mock-bank',
     kredit_jenis: 'default-mock-kredit',
     dpk_portofolio: 'default-mock-dpk',
-    undisbursed_loan: 'default-mock-undisbursed',
   });
   const [history, setHistory] = useState<UploadHistoryItem[]>([]);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -78,16 +77,11 @@ export function useDashboardState() {
       sheet: '', year: 'All', month: 'All', xAxis: 'period', yAxis: [], chartType: 'bar',
       selectedYears: [], selectedMonths: []
     },
-    undisbursed_loan: {
-      sheet: '', year: 'All', month: 'All', xAxis: 'period', yAxis: [], chartType: 'bar',
-      selectedYears: [], selectedMonths: []
-    },
   });
 
   const getActiveCategory = (tab: string) => {
     if (tab.startsWith('kredit_jenis')) return 'kredit_jenis';
     if (tab.startsWith('dpk_portofolio')) return 'dpk_portofolio';
-    if (tab.startsWith('undisbursed_loan')) return 'undisbursed_loan';
     return 'bank_umum';
   };
 
@@ -155,21 +149,7 @@ export function useDashboardState() {
       isSample: true,
     };
 
-    const mockUndisbursedFile = { ...mockFile, name: 'Data Sampel Undisbursed.xlsx', isSample: true };
-    const initialHistoryUndisbursed: UploadHistoryItem = {
-      id: 'default-mock-undisbursed',
-      name: mockUndisbursedFile.name,
-      size: mockUndisbursedFile.size,
-      sheetCount: mockUndisbursedFile.sheetNames.length,
-      rowCount: mockUndisbursedFile.rowCount,
-      uploadDate: mockUndisbursedFile.uploadDate,
-      status: 'success',
-      fileData: mockUndisbursedFile,
-      category: 'undisbursed_loan',
-      isSample: true,
-    };
-
-    return [initialHistoryBankUmum, initialHistoryKredit, initialHistoryDpk, initialHistoryUndisbursed];
+    return [initialHistoryBankUmum, initialHistoryKredit, initialHistoryDpk];
   }, []);
 
   // Sync with Server API (/api/data) to align Localhost & Ngrok users in real-time,
@@ -191,7 +171,7 @@ export function useDashboardState() {
           try {
             const parsed = JSON.parse(storedLocalHistoryRaw) as UploadHistoryItem[];
             const lsUploads = parsed.filter(
-              h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed'
+              h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
             );
             lsUploads.forEach(item => {
               if (!localUserUploads.some(d => d.id === item.id)) {
@@ -202,7 +182,7 @@ export function useDashboardState() {
         }
 
         const cleanedServerHistory = serverHistory.filter(
-          (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed'
+          (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk'
         );
 
         // Merge local user uploads with server history (local uploads take precedence)
@@ -264,11 +244,6 @@ export function useDashboardState() {
         yAxis: [], chartType: 'bar',
         selectedYears: [], selectedMonths: []
       },
-      undisbursed_loan: {
-        sheet: 'Undisbursed Loan', year: 'All', month: 'All', xAxis: 'period',
-        yAxis: [], chartType: 'bar',
-        selectedYears: [], selectedMonths: []
-      },
     });
 
     // Load active file IDs from IndexedDB / localStorage
@@ -315,7 +290,7 @@ export function useDashboardState() {
   // Auto-populate filterState.yAxis (select all indicators) whenever the active file changes
   // This handles: server sync switching activeFileIds, loadHistoryItem, and initial load
   useEffect(() => {
-    const categories = ['bank_umum', 'kredit_jenis', 'dpk_portofolio', 'undisbursed_loan'] as const;
+    const categories = ['bank_umum', 'kredit_jenis', 'dpk_portofolio'] as const;
     setFilterStates(prev => {
       let changed = false;
       const next = { ...prev };
@@ -489,7 +464,7 @@ export function useDashboardState() {
 
   // Delete History Item
   const deleteHistoryItem = async (id: string) => {
-    if (id === 'default-mock-bank' || id === 'default-mock-kredit' || id === 'default-mock-dpk' || id === 'default-mock-undisbursed') {
+    if (id === 'default-mock-bank' || id === 'default-mock-kredit' || id === 'default-mock-dpk') {
       alert('File sampel default tidak dapat dihapus');
       return;
     }
@@ -511,7 +486,7 @@ export function useDashboardState() {
     }
 
     if (activeFileIds[category] === id) {
-      const defaultId = category === 'kredit_jenis' ? 'default-mock-kredit' : category === 'dpk_portofolio' ? 'default-mock-dpk' : category === 'undisbursed_loan' ? 'default-mock-undisbursed' : 'default-mock-bank';
+      const defaultId = category === 'kredit_jenis' ? 'default-mock-kredit' : category === 'dpk_portofolio' ? 'default-mock-dpk' : 'default-mock-bank';
       const newActive = {
         ...activeFileIds,
         [category]: defaultId

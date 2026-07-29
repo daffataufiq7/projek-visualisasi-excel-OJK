@@ -19,7 +19,6 @@ import TemplateDownload from '../components/TemplateDownload';
 import YoyAnalysis from '../components/YoyAnalysis';
 import YoyDashboardWidget from '../components/YoyDashboardWidget';
 import KreditJenisView from '../components/KreditJenisView';
-import UndisbursedLoanView from '../components/UndisbursedLoanView';
 import DpkView from '../components/DpkView';
 import OverviewDashboard from '../components/OverviewDashboard';
 import LoginPage from '../components/LoginPage';
@@ -80,13 +79,6 @@ export default function Home() {
       } else if (tab === 'dpk_portofolio') {
         const sheet = Object.keys(activeFile.sheets).find(
           (s) => s.toLowerCase().includes('dpk') || s.toLowerCase().includes('portofolio')
-        );
-        if (sheet) {
-          handleSheetChange(sheet);
-        }
-      } else if (tab === 'undisbursed_loan') {
-        const sheet = Object.keys(activeFile.sheets).find(
-          (s) => s.toLowerCase().includes('undisbursed') || s.toLowerCase().includes('loan')
         );
         if (sheet) {
           handleSheetChange(sheet);
@@ -194,20 +186,6 @@ export default function Home() {
           </motion.div>
         );
 
-      case 'undisbursed_loan_upload':
-        return (
-          <motion.div {...pageTransition}>
-            <UploadCard
-              onUpload={(file) => handleUpload(file, 'undisbursed_loan')}
-              activeFile={activeFile}
-              loading={loading}
-              progress={uploadProgress}
-              error={uploadError}
-              onErrorClose={() => setUploadError(null)}
-            />
-          </motion.div>
-        );
-
       case 'template':
         return (
           <motion.div {...pageTransition}>
@@ -245,18 +223,6 @@ export default function Home() {
             <UploadHistory
               history={history.filter(h => h.category === 'dpk_portofolio')}
               onLoadItem={(id) => loadHistoryItem(id, 'dpk_portofolio')}
-              onDeleteItem={deleteHistoryItem}
-              activeFileName={activeFile?.name}
-            />
-          </motion.div>
-        );
-
-      case 'undisbursed_loan_history':
-        return (
-          <motion.div {...pageTransition}>
-            <UploadHistory
-              history={history.filter(h => h.category === 'undisbursed_loan')}
-              onLoadItem={(id) => loadHistoryItem(id, 'undisbursed_loan')}
               onDeleteItem={deleteHistoryItem}
               activeFileName={activeFile?.name}
             />
@@ -314,13 +280,6 @@ export default function Home() {
         return (
           <motion.div {...pageTransition}>
             <KreditJenisView activeFile={activeFile} />
-          </motion.div>
-        );
-
-      case 'undisbursed_loan':
-        return (
-          <motion.div {...pageTransition}>
-            <UndisbursedLoanView activeFile={activeFile} />
           </motion.div>
         );
 
