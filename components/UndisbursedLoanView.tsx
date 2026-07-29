@@ -38,9 +38,9 @@ import {
   ReferenceLine
 } from 'recharts';
 import { ActiveFile } from '../types/dashboard';
-import { downloadKreditJenisTemplate } from '../services/excelService';
+import { downloadUndisbursedLoanTemplate } from '../services/excelService';
 
-interface KreditJenisViewProps {
+interface UndisbursedLoanViewProps {
   activeFile?: ActiveFile | null;
 }
 
@@ -53,7 +53,7 @@ const COLORS: { [key: string]: string } = {
 
 const PIE_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899'];
 
-export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
+export default function UndisbursedLoanView({ activeFile }: UndisbursedLoanViewProps) {
   // Global Dashboard Filter States
   const [selectedYears, setSelectedYears] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -73,10 +73,10 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
 
   // Raw sheet data extraction
   const rawSheet = useMemo(() => {
-    let sheet = activeFile?.sheets['Kredit per Jenis Penggunaan'];
+    let sheet = activeFile?.sheets['Undisbursed Loan'];
     if (!sheet) {
       const key = Object.keys(activeFile?.sheets || {}).find(
-        s => s.toLowerCase().includes('kredit') || s.toLowerCase().includes('jenis')
+        s => s.toLowerCase().includes('undisbursed') || s.toLowerCase().includes('loan')
       );
       if (key) sheet = activeFile?.sheets[key];
     }
@@ -131,7 +131,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
   }, [activeFile]);
 
   const allYears = rawSheet.years;
-  const allMonths = rawSheet.months;
+  const allMonths = rawSheet.months.filter(m => m.toLowerCase() !== 'ytd');
   const availableCategories = ['Modal Kerja', 'Investasi', 'Konsumsi'];
 
   // Active years & months after applying global filter
@@ -284,7 +284,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
       }
 
       result.push({
-        category: 'TOTAL KREDIT',
+        category: 'TOTAL UNDISBURSED',
         valTarget: totTarget,
         valBase: totBase,
         diffTrillion: totDiff,
@@ -340,17 +340,23 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
 
   // Main Recharts Data according to selected years & categories
   const chartBarData = useMemo(() => {
-    return activePeriods.map(p => {
+    const data = activePeriods.map(p => {
       const entry: any = {
         periodLabel: `${p.year} (${p.month || 'Tahunan'})`
       };
+      let hasData = false;
       selectedCategories.forEach(cat => {
         const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
         const rawVal = row ? (row[p.key] || row[p.year] || 0) : 0;
-        entry[cat] = safeToTrillion(rawVal);
+        const val = safeToTrillion(rawVal);
+        entry[cat] = val;
+        if (val !== 0) hasData = true;
       });
+      entry._hasData = hasData;
       return entry;
     });
+    // Hanya tampilkan periode yang memiliki data di Excel
+    return data.filter(d => d._hasData);
   }, [activePeriods, selectedCategories, rawSheet]);
 
   const modalKerjaRow = rawSheet.data.find(d => d.indicator?.toLowerCase().includes('modal'));
@@ -434,7 +440,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
   };
 
   const handleExportSVG = () => {
-    const chartContainer = document.getElementById('kredit-chart-container');
+    const chartContainer = document.getElementById('undisbursed-chart-container');
     const svgEl = chartContainer?.querySelector('svg');
     if (!chartContainer || !svgEl) {
       alert('Grafik tidak ditemukan');
@@ -447,7 +453,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = blobUrl;
-    link.download = `FINSIGHT_Kredit_Jenis_${chartType}_${Date.now()}.svg`;
+    link.download = `FINSIGHT_Undisbursed_${chartType}_${Date.now()}.svg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -455,7 +461,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
   };
 
   const handleExportPNG = () => {
-    const chartContainer = document.getElementById('kredit-chart-container');
+    const chartContainer = document.getElementById('undisbursed-chart-container');
     const svgEl = chartContainer?.querySelector('svg');
     if (!chartContainer || !svgEl) {
       alert('Grafik tidak ditemukan');
@@ -481,7 +487,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
       const pngUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = pngUrl;
-      link.download = `FINSIGHT_Kredit_Jenis_${chartType}_${Date.now()}.png`;
+      link.download = `FINSIGHT_Undisbursed_${chartType}_${Date.now()}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -504,18 +510,18 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
             <span className="bg-red-50 text-[#C61E1E] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
               Template Resmi OJK
             </span>
-            <span className="text-xs text-slate-400 font-medium">| Kredit per Jenis Penggunaan</span>
+            <span className="text-xs text-slate-400 font-medium">| Undisbursed Loan</span>
           </div>
           <h1 className="text-xl font-black text-slate-800 tracking-tight">
-            Kredit per Jenis Penggunaan
+            Undisbursed Loan
           </h1>
           <p className="text-xs text-slate-500 font-medium mt-1">
-            Visualisasi penyaluran kredit interaktif dengan opsi filter langsung pada kartu grafik (Bar, Stacked, Line, Pie).
+            Visualisasi undisbursed loan interaktif dengan opsi filter langsung pada kartu grafik (Bar, Stacked, Line, Pie).
           </p>
         </div>
 
         <button
-          onClick={downloadKreditJenisTemplate}
+          onClick={downloadUndisbursedLoanTemplate}
           className="flex items-center gap-2 bg-[#C61E1E] text-white font-bold text-xs px-4 py-3 rounded-2xl hover:bg-[#A31818] transition-all shadow-md active:scale-95 shrink-0"
         >
           <FileSpreadsheet size={16} />
@@ -764,7 +770,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
         {/* 5. Filter Pilih Jenis Penggunaan (Multi-select) */}
         <div className="flex flex-col space-y-2 border-t border-slate-50 pt-4">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            5. Filter Jenis Penggunaan Kredit (Multi-Select)
+            5. Filter Kategori Undisbursed (Multi-Select)
           </span>
           <div className="flex flex-wrap gap-2.5">
             {availableCategories.map((cat) => {
@@ -884,7 +890,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
           </div>
         )}
 
-        {/* Total Kredit Card */}
+        {/* Total Undisbursed Card */}
         <div className="bg-gradient-to-br from-[#C61E1E] to-[#9E1818] text-white rounded-2xl p-5 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center">
@@ -896,7 +902,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
               </span>
             )}
           </div>
-          <p className="text-xs font-bold text-red-200 uppercase tracking-wider">Total Penyaluran Kredit</p>
+          <p className="text-xs font-bold text-red-200 uppercase tracking-wider">Total Undisbursed Loan</p>
           <h3 className="text-lg font-black text-white font-mono mt-1">
             {formatRupiahTrillion(totalRow?.[latestPeriodKey] || totalRow?.['2026-Mei'] || 1080560379391450)}
           </h3>
@@ -918,7 +924,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
           <div>
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               {chartType === 'line' ? <LineIcon size={16} className="text-[#C61E1E]" /> : chartType === 'pie' ? <PieIcon size={16} className="text-[#C61E1E]" /> : <BarChart3 size={16} className="text-[#C61E1E]" />}
-              <span>Tren Nominal Kredit per Jenis Penggunaan (Triliun Rp)</span>
+              <span>Tren Nominal Undisbursed Loan (Triliun Rp)</span>
             </h3>
             <p className="text-[11px] text-slate-400 font-medium mt-0.5">
               Pilih langsung jenis grafik (Bar, Stacked Bar, Line, atau Pie Chart) dan kontrol label angka
@@ -1014,7 +1020,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
           </div>
         </div>
         
-        <div id="kredit-chart-container" className="h-80 w-full relative">
+        <div id="undisbursed-chart-container" className="h-80 w-full relative">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'line' ? (
               <LineChart data={chartBarData} margin={{ top: 25, right: 20, left: -10, bottom: 0 }}>
@@ -1188,7 +1194,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
                     {yoyComparisonData.map((entry, index) => {
                       let color = '#10B981';
                       const cat = entry.category.toLowerCase();
-                      if (cat === 'total kredit') color = '#DC2626'; // Red
+                      if (cat === 'total undisbursed') color = '#DC2626'; // Red
                       else if (cat.includes('modal')) color = '#2563EB'; // Blue
                       else if (cat.includes('investasi')) color = '#F59E0B'; // Amber
                       else if (cat.includes('konsumsi')) color = '#0D9488'; // Teal
@@ -1242,7 +1248,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
                   <span>Visualisasi Distribusi Share (%)</span>
                 </h3>
                 <p className="text-[11px] text-slate-400 font-medium">
-                  Proporsi kontribusi penyaluran kredit per kategori
+                  Proporsi kontribusi undisbursed loan per kategori
                 </p>
               </div>
 
@@ -1264,7 +1270,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
             {/* Visual Multi-Segment Progress Bar */}
             <div className="space-y-3 my-5">
               <div className="flex items-center justify-between text-xs font-bold text-slate-600">
-                <span>Distribusi Portofolio Kredit ({effShareYear})</span>
+                <span>Distribusi Portofolio Undisbursed ({effShareYear})</span>
                 <span className="text-blue-600 font-mono">Total: Rp {shareComparisonData.totalVal.toFixed(2)} T</span>
               </div>
               <div className="h-5 w-full bg-slate-100 rounded-full overflow-hidden flex p-0.5 shadow-inner">
@@ -1337,7 +1343,7 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
               {/* Row 1 Header (Years) */}
               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-center">
                 <th className="p-3.5 border-r border-slate-200 bg-slate-200/60 text-slate-800 text-left font-black w-60">
-                  Kredit per Jenis Penggunaan
+                  Undisbursed Loan
                 </th>
                 {activeYears.map(y => (
                   <th key={y} className="p-3.5 border-r border-slate-200 bg-slate-100 font-black">
