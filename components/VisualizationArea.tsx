@@ -139,7 +139,7 @@ export default function VisualizationArea({ activeFile, filterState }: Visualiza
 
     activeSheetData.periods.forEach((periodKey) => {
       const pUpper = String(periodKey).trim().toUpperCase();
-      if (pUpper === 'YOY' || pUpper === 'SHARE') {
+      if (pUpper === 'YOY' || pUpper === 'SHARE' || pUpper.includes('YTD')) {
         return; // Exclude metric calculation columns from time-series trend charts
       }
 

@@ -1185,12 +1185,21 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
                     contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '12px' }}
                   />
                   <Bar dataKey="yoyPct" radius={[0, 4, 4, 0]}>
-                    {yoyComparisonData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-yoy-${index}`} 
-                        fill={entry.category === 'TOTAL KREDIT' ? '#C61E1E' : entry.isPositive ? '#10B981' : '#EF4444'} 
-                      />
-                    ))}
+                    {yoyComparisonData.map((entry, index) => {
+                      let color = '#10B981';
+                      const cat = entry.category.toLowerCase();
+                      if (cat === 'total kredit') color = '#DC2626'; // Red
+                      else if (cat.includes('modal')) color = '#2563EB'; // Blue
+                      else if (cat.includes('investasi')) color = '#F59E0B'; // Amber
+                      else if (cat.includes('konsumsi')) color = '#0D9488'; // Teal
+                      
+                      return (
+                        <Cell 
+                          key={`cell-yoy-${index}`} 
+                          fill={color} 
+                        />
+                      );
+                    })}
                     {showChartLabels && (
                       <LabelList 
                         dataKey="yoyPct" 

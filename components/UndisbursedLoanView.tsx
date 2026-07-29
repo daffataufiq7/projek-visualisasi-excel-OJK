@@ -131,7 +131,7 @@ export default function UndisbursedLoanView({ activeFile }: UndisbursedLoanViewP
   }, [activeFile]);
 
   const allYears = rawSheet.years;
-  const allMonths = rawSheet.months;
+  const allMonths = rawSheet.months.filter(m => m.toLowerCase() !== 'ytd');
   const availableCategories = ['Modal Kerja', 'Investasi', 'Konsumsi'];
 
   // Active years & months after applying global filter
@@ -340,17 +340,23 @@ export default function UndisbursedLoanView({ activeFile }: UndisbursedLoanViewP
 
   // Main Recharts Data according to selected years & categories
   const chartBarData = useMemo(() => {
-    return activePeriods.map(p => {
+    const data = activePeriods.map(p => {
       const entry: any = {
         periodLabel: `${p.year} (${p.month || 'Tahunan'})`
       };
+      let hasData = false;
       selectedCategories.forEach(cat => {
         const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
         const rawVal = row ? (row[p.key] || row[p.year] || 0) : 0;
-        entry[cat] = safeToTrillion(rawVal);
+        const val = safeToTrillion(rawVal);
+        entry[cat] = val;
+        if (val !== 0) hasData = true;
       });
+      entry._hasData = hasData;
       return entry;
     });
+    // Hanya tampilkan periode yang memiliki data di Excel
+    return data.filter(d => d._hasData);
   }, [activePeriods, selectedCategories, rawSheet]);
 
   const modalKerjaRow = rawSheet.data.find(d => d.indicator?.toLowerCase().includes('modal'));
@@ -1185,12 +1191,21 @@ export default function UndisbursedLoanView({ activeFile }: UndisbursedLoanViewP
                     contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '12px' }}
                   />
                   <Bar dataKey="yoyPct" radius={[0, 4, 4, 0]}>
-                    {yoyComparisonData.map((entry, index) => (
-                      <Cell 
-                        key={`cell-yoy-${index}`} 
-                        fill={entry.category === 'TOTAL UNDISBURSED' ? '#C61E1E' : entry.isPositive ? '#10B981' : '#EF4444'} 
-                      />
-                    ))}
+                    {yoyComparisonData.map((entry, index) => {
+                      let color = '#10B981';
+                      const cat = entry.category.toLowerCase();
+                      if (cat === 'total undisbursed') color = '#DC2626'; // Red
+                      else if (cat.includes('modal')) color = '#2563EB'; // Blue
+                      else if (cat.includes('investasi')) color = '#F59E0B'; // Amber
+                      else if (cat.includes('konsumsi')) color = '#0D9488'; // Teal
+                      
+                      return (
+                        <Cell 
+                          key={`cell-yoy-${index}`} 
+                          fill={color} 
+                        />
+                      );
+                    })}
                     {showChartLabels && (
                       <LabelList 
                         dataKey="yoyPct" 
