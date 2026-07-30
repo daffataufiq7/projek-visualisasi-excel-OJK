@@ -41,6 +41,7 @@ import { downloadDpkTemplate } from '../services/excelService';
 
 interface DpkViewProps {
   activeFile?: ActiveFile | null;
+  onSheetChange?: (sheetName: string, category: string) => void;
 }
 
 const COLORS: { [key: string]: string } = {
@@ -52,7 +53,7 @@ const COLORS: { [key: string]: string } = {
 
 const PIE_COLORS = ['#6366F1', '#10B981', '#F59E0B'];
 
-export default function DpkView({ activeFile }: DpkViewProps) {
+export default function DpkView({ activeFile, onSheetChange }: DpkViewProps) {
   // Global Dashboard Filter States
   const [selectedYears, setSelectedYears] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -565,7 +566,13 @@ export default function DpkView({ activeFile }: DpkViewProps) {
             <div className="relative">
               <select
                 value={selectedSheetName}
-                onChange={(e) => setSelectedSheetName(e.target.value)}
+                onChange={(e) => {
+                  const newSheet = e.target.value;
+                  setSelectedSheetName(newSheet);
+                  if (onSheetChange) {
+                    onSheetChange(newSheet, 'dpk_portofolio');
+                  }
+                }}
                 className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] focus:border-[#C61E1E] cursor-pointer"
               >
                 {availableSheets.map((name) => (

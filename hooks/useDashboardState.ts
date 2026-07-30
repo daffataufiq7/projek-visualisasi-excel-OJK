@@ -290,6 +290,17 @@ export function useDashboardState() {
     return item?.fileData || null;
   }, [activeCategory, activeFileIds, userHistory]);
 
+  const activeFiles = useMemo(() => {
+    const result: { [category: string]: ActiveFile | null } = {};
+    const categories = ['bank_umum', 'kredit_jenis', 'dpk_portofolio', 'undisbursed_loan'];
+    categories.forEach(cat => {
+      const activeId = activeFileIds[cat];
+      const item = userHistory.find(h => h.id === activeId);
+      result[cat] = item?.fileData || null;
+    });
+    return result;
+  }, [activeFileIds, userHistory]);
+
   // Unified mock item definitions
   const defaultMockItems = useMemo(() => {
     const mockFile = generateMockFile();
@@ -812,18 +823,36 @@ export function useDashboardState() {
     }
   };
 
-  // Triggered when user changes the active sheet inside Filter
-  const handleSheetChange = (sheetName: string) => {
-    if (!activeFile) return;
-    const sheetData = activeFile.sheets[sheetName];
-    if (!sheetData) return;
+  // Triggered when user changes the active sheet inside Filter or View components
+  const handleSheetChange = (sheetName: string, category?: string) => {
+    const targetCat = category || activeCategory;
+    const targetActiveId = activeFileIds[targetCat];
+    const item = history.find(h => h.id === targetActiveId);
 
-    setFilterState({
-      sheet: sheetName,
-      xAxis: 'period',
-      yAxis: sheetData.indicators,
-      selectedYears: [],
-      selectedMonths: [],
+    if (item && item.fileData && item.fileData.sheets[sheetName]) {
+      const updatedFileData: ActiveFile = {
+        ...item.fileData,
+        activeSheetName: sheetName
+      };
+      const updatedHistory = history.map(h => h.id === item.id ? { ...h, fileData: updatedFileData } : h);
+      setHistory(updatedHistory);
+      saveHistoryToDB(updatedHistory);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+      } catch (e) {}
+    }
+
+    setFilterStates(prev => {
+      const current = prev[targetCat];
+      const sheetData = item?.fileData?.sheets[sheetName];
+      return {
+        ...prev,
+        [targetCat]: {
+          ...current,
+          sheet: sheetName,
+          ...(sheetData ? { yAxis: sheetData.indicators } : {})
+        }
+      };
     });
   };
 
@@ -882,6 +911,7 @@ export function useDashboardState() {
     login,
     logout,
     activeFile,
+    activeFiles,
     history: userHistory,
     activeTab,
     sidebarCollapsed,

@@ -42,6 +42,7 @@ import { downloadKreditJenisTemplate } from '../services/excelService';
 
 interface KreditJenisViewProps {
   activeFile?: ActiveFile | null;
+  onSheetChange?: (sheetName: string, category: string) => void;
 }
 
 const COLORS: { [key: string]: string } = {
@@ -53,7 +54,7 @@ const COLORS: { [key: string]: string } = {
 
 const PIE_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899'];
 
-export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
+export default function KreditJenisView({ activeFile, onSheetChange }: KreditJenisViewProps) {
   // Global Dashboard Filter States
   const [selectedYears, setSelectedYears] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -566,7 +567,13 @@ export default function KreditJenisView({ activeFile }: KreditJenisViewProps) {
             <div className="relative">
               <select
                 value={selectedSheetName}
-                onChange={(e) => setSelectedSheetName(e.target.value)}
+                onChange={(e) => {
+                  const newSheet = e.target.value;
+                  setSelectedSheetName(newSheet);
+                  if (onSheetChange) {
+                    onSheetChange(newSheet, 'kredit_jenis');
+                  }
+                }}
                 className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] focus:border-[#C61E1E] cursor-pointer"
               >
                 {availableSheets.map((name) => (

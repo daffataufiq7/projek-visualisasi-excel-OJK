@@ -36,6 +36,7 @@ import AiAnalysisCards from './AiAnalysisCards';
 
 interface OverviewDashboardProps {
   activeFile: ActiveFile;
+  allActiveFiles?: { [category: string]: ActiveFile | null };
   onNavigateTab: (tab: string) => void;
 }
 
@@ -108,7 +109,7 @@ const normalizeToTrillion = (val: number): number => {
   return parseFloat(val.toFixed(1));
 };
 
-export default function OverviewDashboard({ activeFile, onNavigateTab }: OverviewDashboardProps) {
+export default function OverviewDashboard({ activeFile, allActiveFiles, onNavigateTab }: OverviewDashboardProps) {
   // Independent Chart Type Switchers per sector (Bar vs Pie)
   const [bankUmumChartType, setBankUmumChartType] = useState<'bar' | 'pie'>('bar');
   const [kreditChartType, setKreditChartType] = useState<'bar' | 'pie'>('bar');
@@ -123,67 +124,83 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
     setUndisbursedChartType(type);
   };
 
-  // Extract sheets safely with smart fallback
+  // Extract sheets safely with smart fallback & honor explicit activeSheetName
   const bankUmumSheet = useMemo(() => {
-    if (!activeFile?.sheets) return null;
-    const key = Object.keys(activeFile.sheets).find(
+    const file = allActiveFiles?.bank_umum || activeFile;
+    if (!file?.sheets) return null;
+    if (file.activeSheetName && file.sheets[file.activeSheetName]) {
+      return file.sheets[file.activeSheetName];
+    }
+    const key = Object.keys(file.sheets).find(
       s => s.toLowerCase().includes('bank') || s.toLowerCase().includes('umum') || s.toLowerCase().includes('kinerja')
     );
-    if (key) return activeFile.sheets[key];
+    if (key) return file.sheets[key];
 
-    const foundByData = Object.values(activeFile.sheets).find((s: any) =>
+    const foundByData = Object.values(file.sheets).find((s: any) =>
       s.data?.some((d: any) => String(d.indicator || '').toLowerCase().includes('aset'))
     );
-    return foundByData || Object.values(activeFile.sheets)[0] || null;
-  }, [activeFile]);
+    return foundByData || Object.values(file.sheets)[0] || null;
+  }, [allActiveFiles, activeFile]);
 
   const kreditSheet = useMemo(() => {
-    if (!activeFile?.sheets) return null;
-    const key = Object.keys(activeFile.sheets).find(
+    const file = allActiveFiles?.kredit_jenis || activeFile;
+    if (!file?.sheets) return null;
+    if (file.activeSheetName && file.sheets[file.activeSheetName]) {
+      return file.sheets[file.activeSheetName];
+    }
+    const key = Object.keys(file.sheets).find(
       s => s.toLowerCase().includes('kredit') || s.toLowerCase().includes('jenis')
     );
-    if (key) return activeFile.sheets[key];
+    if (key) return file.sheets[key];
 
-    const foundByData = Object.values(activeFile.sheets).find((s: any) =>
+    const foundByData = Object.values(file.sheets).find((s: any) =>
       s.data?.some((d: any) => {
         const ind = String(d.indicator || '').toLowerCase();
         return ind.includes('modal') || ind.includes('investasi') || ind.includes('konsumsi');
       })
     );
-    return foundByData || null;
-  }, [activeFile]);
+    return foundByData || Object.values(file.sheets)[0] || null;
+  }, [allActiveFiles, activeFile]);
 
   const dpkSheet = useMemo(() => {
-    if (!activeFile?.sheets) return null;
-    const key = Object.keys(activeFile.sheets).find(
+    const file = allActiveFiles?.dpk_portofolio || activeFile;
+    if (!file?.sheets) return null;
+    if (file.activeSheetName && file.sheets[file.activeSheetName]) {
+      return file.sheets[file.activeSheetName];
+    }
+    const key = Object.keys(file.sheets).find(
       s => s.toLowerCase().includes('dpk') || s.toLowerCase().includes('portofolio')
     );
-    if (key) return activeFile.sheets[key];
+    if (key) return file.sheets[key];
 
-    const foundByData = Object.values(activeFile.sheets).find((s: any) =>
+    const foundByData = Object.values(file.sheets).find((s: any) =>
       s.data?.some((d: any) => {
         const ind = String(d.indicator || '').toLowerCase();
         return ind.includes('giro') || ind.includes('tabungan') || ind.includes('deposito');
       })
     );
-    return foundByData || null;
-  }, [activeFile]);
+    return foundByData || Object.values(file.sheets)[0] || null;
+  }, [allActiveFiles, activeFile]);
 
   const undisbursedSheet = useMemo(() => {
-    if (!activeFile?.sheets) return null;
-    const key = Object.keys(activeFile.sheets).find(
+    const file = allActiveFiles?.undisbursed_loan || activeFile;
+    if (!file?.sheets) return null;
+    if (file.activeSheetName && file.sheets[file.activeSheetName]) {
+      return file.sheets[file.activeSheetName];
+    }
+    const key = Object.keys(file.sheets).find(
       s => s.toLowerCase().includes('undisbursed') || s.toLowerCase().includes('loan') || s.toLowerCase().includes('belum')
     );
-    if (key) return activeFile.sheets[key];
+    if (key) return file.sheets[key];
 
-    const foundByData = Object.values(activeFile.sheets).find((s: any) =>
+    const foundByData = Object.values(file.sheets).find((s: any) =>
       s.data?.some((d: any) => {
         const ind = String(d.indicator || '').toLowerCase();
         return ind.includes('undisbursed') || ind.includes('belum ditarik');
       })
     );
-    return foundByData || null;
-  }, [activeFile]);
+    return foundByData || Object.values(file.sheets)[0] || null;
+  }, [allActiveFiles, activeFile]);
 
   // 1. Bank Umum Primary Chart Data (Perbankan Jawa Barat)
   const bankUmumChartData = useMemo(() => {

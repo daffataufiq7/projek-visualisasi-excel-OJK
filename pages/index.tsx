@@ -33,6 +33,7 @@ export default function Home() {
     login,
     logout,
     activeFile,
+    activeFiles,
     history,
     activeTab,
     sidebarCollapsed,
@@ -62,38 +63,32 @@ export default function Home() {
     }));
   };
 
-  // Tab change handler that automatically presets the correct sheet
+  // Tab change handler that automatically presets the correct sheet ONLY if none is active
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     
     if (activeFile) {
-      if (tab === 'bank_umum') {
-        const sheet = Object.keys(activeFile.sheets).find(
-          (s) => s.toLowerCase().includes('bank') || s.toLowerCase().includes('umum')
-        );
-        if (sheet) {
-          handleSheetChange(sheet);
-        }
-      } else if (tab === 'kredit_jenis') {
-        const sheet = Object.keys(activeFile.sheets).find(
-          (s) => s.toLowerCase().includes('kredit') || s.toLowerCase().includes('jenis')
-        );
-        if (sheet) {
-          handleSheetChange(sheet);
-        }
-      } else if (tab === 'dpk_portofolio') {
-        const sheet = Object.keys(activeFile.sheets).find(
-          (s) => s.toLowerCase().includes('dpk') || s.toLowerCase().includes('portofolio')
-        );
-        if (sheet) {
-          handleSheetChange(sheet);
-        }
-      } else if (tab === 'undisbursed_loan') {
-        const sheet = Object.keys(activeFile.sheets).find(
-          (s) => s.toLowerCase().includes('undisbursed')
-        );
-        if (sheet) {
-          handleSheetChange(sheet);
+      if (!activeFile.activeSheetName || !activeFile.sheets[activeFile.activeSheetName]) {
+        if (tab === 'bank_umum') {
+          const sheet = Object.keys(activeFile.sheets).find(
+            (s) => s.toLowerCase().includes('bank') || s.toLowerCase().includes('umum')
+          );
+          if (sheet) handleSheetChange(sheet);
+        } else if (tab === 'kredit_jenis') {
+          const sheet = Object.keys(activeFile.sheets).find(
+            (s) => s.toLowerCase().includes('kredit') || s.toLowerCase().includes('jenis')
+          );
+          if (sheet) handleSheetChange(sheet);
+        } else if (tab === 'dpk_portofolio') {
+          const sheet = Object.keys(activeFile.sheets).find(
+            (s) => s.toLowerCase().includes('dpk') || s.toLowerCase().includes('portofolio')
+          );
+          if (sheet) handleSheetChange(sheet);
+        } else if (tab === 'undisbursed_loan') {
+          const sheet = Object.keys(activeFile.sheets).find(
+            (s) => s.toLowerCase().includes('undisbursed')
+          );
+          if (sheet) handleSheetChange(sheet);
         }
       }
     }
@@ -138,7 +133,7 @@ export default function Home() {
 
         return (
           <motion.div {...pageTransition}>
-            <OverviewDashboard activeFile={activeFile} onNavigateTab={handleTabChange} />
+            <OverviewDashboard activeFile={activeFile} allActiveFiles={activeFiles} onNavigateTab={handleTabChange} />
           </motion.div>
         );
 
@@ -274,7 +269,7 @@ export default function Home() {
       case 'undisbursed_loan':
         return (
           <motion.div {...pageTransition}>
-            <UndisbursedLoanView activeFile={activeFile} />
+            <UndisbursedLoanView activeFile={activeFile} onSheetChange={handleSheetChange} />
           </motion.div>
         );
 
@@ -328,14 +323,14 @@ export default function Home() {
       case 'kredit_jenis':
         return (
           <motion.div {...pageTransition}>
-            <KreditJenisView activeFile={activeFile} />
+            <KreditJenisView activeFile={activeFile} onSheetChange={handleSheetChange} />
           </motion.div>
         );
 
       case 'dpk_portofolio':
         return (
           <motion.div {...pageTransition}>
-            <DpkView activeFile={activeFile} />
+            <DpkView activeFile={activeFile} onSheetChange={handleSheetChange} />
           </motion.div>
         );
 
