@@ -216,7 +216,7 @@ export default function OverviewDashboard({ activeFile, allActiveFiles, onNaviga
     );
     const periods = dataPeriods.length > 0 ? dataPeriods.slice(-5) : bankUmumSheet.periods.slice(-5);
 
-    return periods.map(p => {
+    const mapped = periods.map(p => {
       const asetRaw = getIndicatorValue(bankUmumSheet, ['aset'], p);
       const dpkRaw = getIndicatorValue(bankUmumSheet, ['dana pihak ketiga', 'dpk'], p);
       const kreditRaw = getIndicatorValue(bankUmumSheet, ['kredit'], p);
@@ -229,9 +229,13 @@ export default function OverviewDashboard({ activeFile, allActiveFiles, onNaviga
         period: p.replace('-', ' '),
         Aset: aset,
         DPK: dpk,
-        Kredit: kredit
+        Kredit: kredit,
+        _total: aset + dpk + kredit
       };
     });
+
+    const filtered = mapped.filter(item => item._total > 0);
+    return filtered.length > 0 ? filtered : mapped;
   }, [bankUmumSheet]);
 
   // Bank Umum Pie Data for latest period
@@ -260,18 +264,26 @@ export default function OverviewDashboard({ activeFile, allActiveFiles, onNaviga
     );
     const periods = dataPeriods.length > 0 ? dataPeriods.slice(-5) : kreditSheet.periods.slice(-5);
 
-    return periods.map(p => {
+    const mapped = periods.map(p => {
       const mkRaw = getIndicatorValue(kreditSheet, ['modal kerja', 'modal'], p);
       const invRaw = getIndicatorValue(kreditSheet, ['investasi', 'invest'], p);
       const konRaw = getIndicatorValue(kreditSheet, ['konsumsi', 'konsum'], p);
 
+      const mk = normalizeToTrillion(mkRaw);
+      const inv = normalizeToTrillion(invRaw);
+      const kon = normalizeToTrillion(konRaw);
+
       return {
         period: p.replace('-', ' '),
-        'Modal Kerja': normalizeToTrillion(mkRaw),
-        'Investasi': normalizeToTrillion(invRaw),
-        'Konsumsi': normalizeToTrillion(konRaw)
+        'Modal Kerja': mk,
+        'Investasi': inv,
+        'Konsumsi': kon,
+        _total: mk + inv + kon
       };
     });
+
+    const filtered = mapped.filter(item => item._total > 0);
+    return filtered.length > 0 ? filtered : mapped;
   }, [kreditSheet]);
 
   // Kredit Pie Data for latest year
@@ -328,18 +340,26 @@ export default function OverviewDashboard({ activeFile, allActiveFiles, onNaviga
     );
     const periods = dataPeriods.length > 0 ? dataPeriods.slice(-5) : dpkSheet.periods.slice(-5);
 
-    return periods.map(p => {
+    const mapped = periods.map(p => {
       const tabRaw = getIndicatorValue(dpkSheet, ['tabungan', 'tabung'], p);
       const depRaw = getIndicatorValue(dpkSheet, ['deposito', 'depos'], p);
       const giroRaw = getIndicatorValue(dpkSheet, ['giro'], p);
 
+      const tab = normalizeToTrillion(tabRaw);
+      const dep = normalizeToTrillion(depRaw);
+      const giro = normalizeToTrillion(giroRaw);
+
       return {
         period: p.replace('-', ' '),
-        Tabungan: normalizeToTrillion(tabRaw),
-        Deposito: normalizeToTrillion(depRaw),
-        Giro: normalizeToTrillion(giroRaw)
+        Tabungan: tab,
+        Deposito: dep,
+        Giro: giro,
+        _total: tab + dep + giro
       };
     });
+
+    const filtered = mapped.filter(item => item._total > 0);
+    return filtered.length > 0 ? filtered : mapped;
   }, [dpkSheet]);
 
   // 4. Undisbursed Loan Primary Chart Data
@@ -356,18 +376,26 @@ export default function OverviewDashboard({ activeFile, allActiveFiles, onNaviga
     );
     const periods = dataPeriods.length > 0 ? dataPeriods.slice(-5) : undisbursedSheet.periods.slice(-5);
 
-    return periods.map(p => {
+    const mapped = periods.map(p => {
       const mkRaw = getIndicatorValue(undisbursedSheet, ['modal kerja', 'modal'], p);
       const invRaw = getIndicatorValue(undisbursedSheet, ['investasi', 'invest'], p);
       const konRaw = getIndicatorValue(undisbursedSheet, ['konsumsi', 'konsum'], p);
 
+      const mk = normalizeToTrillion(mkRaw);
+      const inv = normalizeToTrillion(invRaw);
+      const kon = normalizeToTrillion(konRaw);
+
       return {
         period: p.replace('-', ' '),
-        'Modal Kerja': normalizeToTrillion(mkRaw),
-        'Investasi': normalizeToTrillion(invRaw),
-        'Konsumsi': normalizeToTrillion(konRaw)
+        'Modal Kerja': mk,
+        'Investasi': inv,
+        'Konsumsi': kon,
+        _total: mk + inv + kon
       };
     });
+
+    const filtered = mapped.filter(item => item._total > 0);
+    return filtered.length > 0 ? filtered : mapped;
   }, [undisbursedSheet]);
 
   // Undisbursed Pie Data for latest year
