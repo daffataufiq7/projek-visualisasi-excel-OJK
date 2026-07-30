@@ -154,7 +154,13 @@ export default function UndisbursedLoanView({ activeFile, onSheetChange }: Undis
   }, [activeFile]);
 
   const allYears = rawSheet.years;
-  const allMonths = rawSheet.months.filter((m: string) => m.toLowerCase() !== 'ytd');
+  // Exclude YTD/YOY/SHARE from regular month columns for main chart
+  const allMonths = rawSheet.months.filter((m: string) => {
+    const ml = m.toLowerCase();
+    return ml !== 'ytd' && ml !== 'yoy' && ml !== 'share' && !ml.includes('yoy') && !ml.includes('share');
+  });
+  // YTD months separately (for table right-edge columns)
+  const ytdMonths = rawSheet.months.filter((m: string) => m.toLowerCase() === 'ytd');
   const availableCategories = ['Modal Kerja', 'Investasi', 'Konsumsi'];
 
   // Active years & months after applying global filter
@@ -361,19 +367,30 @@ export default function UndisbursedLoanView({ activeFile, onSheetChange }: Undis
     };
   }, [selectedCategories, rawSheet, effShareYear, activeMonthLabel]);
 
-  // Main Recharts Data according to selected years & categories
+  // Main Recharts Data — only regular periods (NO YTD/YOY/SHARE), filtered to non-zero
   const chartBarData = useMemo(() => {
-    return activePeriods.map(p => {
-      const entry: any = {
-        periodLabel: `${p.year} (${p.month || 'Tahunan'})`
-      };
-      selectedCategories.forEach(cat => {
-        const row = rawSheet.data.find((r: any) => r.indicator?.toLowerCase() === cat.toLowerCase());
-        const rawVal = row ? (row[p.key] || row[p.year] || 0) : 0;
-        entry[cat] = safeToTrillion(rawVal);
+    const mapped = activePeriods
+      .filter(p => {
+        const ml = p.month.toLowerCase();
+        return ml !== 'ytd' && !ml.includes('yoy') && !ml.includes('share');
+      })
+      .map(p => {
+        const entry: any = {
+          periodLabel: p.month ? `${p.year} ${p.month}` : p.year
+        };
+        let rowTotal = 0;
+        selectedCategories.forEach(cat => {
+          const row = rawSheet.data.find((r: any) => r.indicator?.toLowerCase() === cat.toLowerCase());
+          const rawVal = row ? (row[p.key] ?? row[p.year] ?? 0) : 0;
+          const val = safeToTrillion(rawVal);
+          entry[cat] = val;
+          rowTotal += val;
+        });
+        entry._total = rowTotal;
+        return entry;
       });
-      return entry;
-    });
+    const filtered = mapped.filter(e => e._total > 0);
+    return filtered.length > 0 ? filtered : mapped;
   }, [activePeriods, selectedCategories, rawSheet]);
 
   const modalKerjaRow = rawSheet.data.find((d: any) => d.indicator?.toLowerCase().includes('modal'));
@@ -1358,15 +1375,15 @@ export default function UndisbursedLoanView({ activeFile, onSheetChange }: Undis
 
       </div>
 
-      {/* Dynamic Master Table View with Filter Toggles */}
+      {/* Dynamic Master Table View — Template Excel Struktur Resmi OJK */}
       <div className="bg-white border border-slate-100 rounded-3xl shadow-soft p-6 space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-4 gap-2">
           <div>
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
-              Struktur Tabel Template Excel (Filter Aktif)
+              Preview Tabel Template Excel — Undisbursed Loan
             </h3>
             <p className="text-[11px] text-slate-400 font-semibold mt-0.5">
-              Menampilkan {activePeriods.length} periode & {filteredData.mainRows.length} kategori terpilih
+              Kolom periode data (kiri) · YTD · YoY · Share(%) dipisah di sisi kanan sesuai template OJK
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1376,67 +1393,100 @@ export default function UndisbursedLoanView({ activeFile, onSheetChange }: Undis
           </div>
         </div>
 
-        {/* Scrollable Table View */}
+        {/* Scrollable Table View — multi-month per year like Excel template */}
         <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="text-left border-collapse text-xs" style={{ minWidth: 'max-content', width: '100%' }}>
             <thead>
-              {/* Row 1 Header (Years) */}
+              {/* Row 1: Undisbursed Loan label | Year groups spanning month columns | YTD | YOY | SHARE */}
               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-center">
-                <th className="p-3.5 border-r border-slate-200 bg-slate-200/60 text-slate-800 text-left font-black w-60">
+                <th rowSpan={2} className="p-3.5 border-r border-slate-200 bg-slate-200/60 text-slate-800 text-left font-black" style={{ minWidth: '180px' }}>
                   Undisbursed Loan
                 </th>
                 {activeYears.map((y: string) => (
-                  <th key={y} className="p-3.5 border-r border-slate-200 bg-slate-100 font-black">
+                  <th key={y} colSpan={activeMonths.length || 1} className="p-3 border-r border-slate-200 bg-slate-100 font-black text-slate-900">
                     {y}
                   </th>
                 ))}
-                {showYoy && <th className="p-3.5 border-r border-slate-200 bg-slate-100/50"></th>}
-                {showShare && <th className="p-3.5 bg-slate-100/50"></th>}
+                {/* YTD column header — shown if template has YTD */}
+                {ytdMonths.length > 0 && (
+                  <th colSpan={activeYears.length} className="p-3 border-r border-slate-200 bg-purple-50 text-purple-700 font-black">
+                    YTD
+                  </th>
+                )}
+                {showYoy && (
+                  <th rowSpan={2} className="p-3 border-r border-slate-200 bg-amber-50 text-amber-700 font-black">
+                    YoY (%)
+                  </th>
+                )}
+                {showShare && (
+                  <th rowSpan={2} className="p-3 bg-blue-50 text-blue-700 font-black">
+                    Share (%)
+                  </th>
+                )}
               </tr>
-              {/* Row 2 Header (Months / YOY / SHARE) */}
+              {/* Row 2: Month sub-columns per year | YTD sub-cols | (YoY/Share span from row 1) */}
               <tr className="bg-slate-50 font-bold text-slate-600 border-b border-slate-200 text-center">
-                <th className="p-3 border-r border-slate-200 bg-slate-100/40"></th>
-                {activeYears.map((y: string) => (
-                  <th key={y} className="p-3 border-r border-slate-200 bg-red-50/60 text-[#C61E1E] font-black">
-                    {activeMonths.join(', ') || 'Mei'}
+                {activeYears.map((y: string) =>
+                  (activeMonths.length > 0 ? activeMonths : ['Mei']).map((m: string) => (
+                    <th key={`${y}-${m}`} className="p-2.5 border-r border-slate-200 bg-red-50/50 text-[#C61E1E] font-black" style={{ minWidth: '120px' }}>
+                      {m}
+                    </th>
+                  ))
+                )}
+                {ytdMonths.length > 0 && activeYears.map((y: string) => (
+                  <th key={`ytd-${y}`} className="p-2.5 border-r border-slate-200 bg-purple-50/80 text-purple-700 font-black" style={{ minWidth: '110px' }}>
+                    {y}
                   </th>
                 ))}
-                {showYoy && <th className="p-3 border-r border-slate-200 bg-amber-50 text-amber-700 font-black">YOY</th>}
-                {showShare && <th className="p-3 bg-blue-50 text-blue-700 font-black">SHARE</th>}
               </tr>
             </thead>
             <tbody>
-              {/* Filtered Data Rows */}
+              {/* Category Data Rows */}
               {filteredData.mainRows.map((row: any, idx: number) => (
                 <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
-                  <td className="p-3.5 border-r border-slate-200 font-bold text-slate-800">
+                  {/* Indicator label */}
+                  <td className="p-3.5 border-r border-slate-200 font-bold text-slate-800 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[row.indicator] || '#64748B' }}></span>
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[row.indicator] || '#64748B' }}></span>
                       <span>{row.indicator}</span>
                     </div>
                   </td>
-                  {activeYears.map((y: string) => {
-                    const periodKey = `${y}-${activeMonths[0] || 'Mei'}`;
-                    const val = row[periodKey] ?? row[y];
+                  {/* Period columns: each year × each month */}
+                  {activeYears.map((y: string) =>
+                    (activeMonths.length > 0 ? activeMonths : ['Mei']).map((m: string) => {
+                      const key = `${y}-${m}`;
+                      const val = row[key] ?? row[y];
+                      return (
+                        <td key={key} className="p-3 border-r border-slate-200 text-right font-mono text-slate-700 whitespace-nowrap">
+                          {typeof val === 'number' ? val.toLocaleString('id-ID') : (val ?? '-')}
+                        </td>
+                      );
+                    })
+                  )}
+                  {/* YTD columns: one per year */}
+                  {ytdMonths.length > 0 && activeYears.map((y: string) => {
+                    const key = `${y}-YTD`;
+                    const val = row[key] ?? row['YTD'];
                     return (
-                      <td key={y} className="p-3.5 border-r border-slate-200 text-right font-mono text-slate-700">
-                        {typeof val === 'number' ? val.toLocaleString('id-ID') : (val || '-')}
+                      <td key={`ytd-${y}`} className="p-3 border-r border-slate-200 text-right font-mono text-purple-700 bg-purple-50/30 whitespace-nowrap">
+                        {typeof val === 'number' ? val.toLocaleString('id-ID') : (val ?? '-')}
                       </td>
                     );
                   })}
+                  {/* YoY column */}
                   {showYoy && (
-                    <td className={`p-3.5 border-r border-slate-200 text-right font-mono font-bold ${
+                    <td className={`p-3.5 border-r border-slate-200 text-right font-mono font-bold whitespace-nowrap ${
                       Number(row['YOY']) < 0 ? 'text-red-600 bg-red-50/30' : 'text-emerald-700 bg-emerald-50/30'
                     }`}>
                       {formatPercent(row['YOY'])}
                     </td>
                   )}
+                  {/* Share column */}
                   {showShare && (
-                    <td className="p-3.5 text-right font-mono font-bold text-blue-700 bg-blue-50/30">
-                      {typeof row['SHARE'] === 'number' 
+                    <td className="p-3.5 text-right font-mono font-bold text-blue-700 bg-blue-50/30 whitespace-nowrap">
+                      {typeof row['SHARE'] === 'number'
                         ? `${(row['SHARE'] > 1 ? row['SHARE'] : row['SHARE'] * 100).toFixed(2)}%`
-                        : (row['SHARE'] || '0.00%')
-                      }
+                        : (row['SHARE'] || '-')}
                     </td>
                   )}
                 </tr>
@@ -1444,26 +1494,37 @@ export default function UndisbursedLoanView({ activeFile, onSheetChange }: Undis
 
               {/* Total Row */}
               {filteredData.totalRow && (
-                <tr className="bg-slate-100/70 font-black text-[#1E293B] border-t-2 border-t-slate-300 border-b border-slate-200">
-                  <td className="p-3.5 border-r border-slate-200 font-black text-slate-900 bg-slate-200/40">
+                <tr className="bg-slate-200/50 font-black text-slate-900 border-t-2 border-t-slate-300">
+                  <td className="p-3.5 border-r border-slate-200 font-black text-slate-900 bg-slate-200/60 whitespace-nowrap">
                     Total
                   </td>
-                  {activeYears.map((y: string) => {
-                    const periodKey = `${y}-${activeMonths[0] || 'Mei'}`;
-                    const val = filteredData.totalRow?.[periodKey] ?? filteredData.totalRow?.[y];
+                  {activeYears.map((y: string) =>
+                    (activeMonths.length > 0 ? activeMonths : ['Mei']).map((m: string) => {
+                      const key = `${y}-${m}`;
+                      const val = filteredData.totalRow?.[key] ?? filteredData.totalRow?.[y];
+                      return (
+                        <td key={key} className="p-3 border-r border-slate-200 text-right font-mono font-black text-slate-900 whitespace-nowrap">
+                          {typeof val === 'number' ? val.toLocaleString('id-ID') : (val ?? '-')}
+                        </td>
+                      );
+                    })
+                  )}
+                  {ytdMonths.length > 0 && activeYears.map((y: string) => {
+                    const key = `${y}-YTD`;
+                    const val = filteredData.totalRow?.[key] ?? filteredData.totalRow?.['YTD'];
                     return (
-                      <td key={y} className="p-3.5 border-r border-slate-200 text-right font-mono font-black text-slate-900">
-                        {typeof val === 'number' ? val.toLocaleString('id-ID') : (val || '-')}
+                      <td key={`ytd-total-${y}`} className="p-3 border-r border-slate-200 text-right font-mono font-black text-purple-800 bg-purple-50/50 whitespace-nowrap">
+                        {typeof val === 'number' ? val.toLocaleString('id-ID') : (val ?? '-')}
                       </td>
                     );
                   })}
                   {showYoy && (
-                    <td className="p-3.5 border-r border-slate-200 text-right font-mono font-black text-emerald-700 bg-emerald-50/50">
+                    <td className="p-3.5 border-r border-slate-200 text-right font-mono font-black text-emerald-700 bg-emerald-50/50 whitespace-nowrap">
                       {formatPercent(filteredData.totalRow?.['YOY'] ?? 0.0486)}
                     </td>
                   )}
                   {showShare && (
-                    <td className="p-3.5 text-right font-mono font-black text-blue-700 bg-blue-50/50">
+                    <td className="p-3.5 text-right font-mono font-black text-blue-700 bg-blue-50/50 whitespace-nowrap">
                       100.00%
                     </td>
                   )}
