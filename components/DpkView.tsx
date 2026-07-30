@@ -70,14 +70,32 @@ export default function DpkView({ activeFile }: DpkViewProps) {
   const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
   const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
 
+  // Available sheets list
+  const availableSheets = useMemo(() => {
+    return activeFile?.sheetNames || (activeFile?.sheets ? Object.keys(activeFile.sheets) : []);
+  }, [activeFile]);
+
+  const [selectedSheetName, setSelectedSheetName] = useState<string>('');
+
+  React.useEffect(() => {
+    if (availableSheets.length > 0) {
+      if (!selectedSheetName || !availableSheets.includes(selectedSheetName)) {
+        setSelectedSheetName(activeFile?.activeSheetName || availableSheets[0]);
+      }
+    }
+  }, [availableSheets, activeFile]);
+
   // Raw sheet data extraction for DPK
   const rawSheet = useMemo(() => {
-    let sheet = activeFile?.sheets['DPK per Portofolio'];
-    if (!sheet) {
-      const key = Object.keys(activeFile?.sheets || {}).find(
+    let sheet: any = selectedSheetName && activeFile?.sheets ? activeFile.sheets[selectedSheetName] : null;
+    if (!sheet && activeFile?.sheets) {
+      sheet = activeFile.sheets['DPK per Portofolio'];
+    }
+    if (!sheet && activeFile?.sheets) {
+      const key = Object.keys(activeFile.sheets).find(
         s => s.toLowerCase().includes('dpk') || s.toLowerCase().includes('portofolio')
       );
-      if (key) sheet = activeFile?.sheets[key];
+      if (key) sheet = activeFile.sheets[key];
     }
     if (!sheet && activeFile?.sheets && Object.keys(activeFile.sheets).length > 0) {
       const firstKey = Object.keys(activeFile.sheets)[0];
@@ -140,12 +158,12 @@ export default function DpkView({ activeFile }: DpkViewProps) {
   // Active years & months after applying global filter
   const activeYears = useMemo(() => {
     if (selectedYears.length === 0) return allYears;
-    return allYears.filter(y => selectedYears.includes(y));
+    return allYears.filter((y: string) => selectedYears.includes(y));
   }, [allYears, selectedYears]);
 
   const activeMonths = useMemo(() => {
     if (selectedMonths.length === 0) return allMonths;
-    return allMonths.filter(m => selectedMonths.includes(m));
+    return allMonths.filter((m: string) => selectedMonths.includes(m));
   }, [allMonths, selectedMonths]);
 
   // Selected Target and Base Years for YoY Comparison Chart
@@ -168,8 +186,8 @@ export default function DpkView({ activeFile }: DpkViewProps) {
   // Compute active period columns (e.g. ['2024-Mei', '2025-Mei', '2026-Mei'])
   const activePeriods = useMemo(() => {
     const periods: { year: string; month: string; key: string }[] = [];
-    activeYears.forEach(y => {
-      activeMonths.forEach(m => {
+    activeYears.forEach((y: string) => {
+      activeMonths.forEach((m: string) => {
         periods.push({
           year: y,
           month: m,
@@ -182,13 +200,13 @@ export default function DpkView({ activeFile }: DpkViewProps) {
 
   // Filtered rows for table & cards
   const filteredData = useMemo(() => {
-    const mainRows = rawSheet.data.filter(row => {
+    const mainRows = rawSheet.data.filter((row: any) => {
       const ind = row.indicator;
       if (!ind || ind.toLowerCase() === 'total') return false;
       return selectedCategories.includes(ind);
     });
 
-    const totalRow = rawSheet.data.find(row => row.indicator?.toLowerCase() === 'total' || row.indicator === 'Total');
+    const totalRow = rawSheet.data.find((row: any) => row.indicator?.toLowerCase() === 'total' || row.indicator === 'Total');
 
     return {
       mainRows,
@@ -246,7 +264,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
     const baseKey = `${effYoyBase}-${activeMonthLabel}`;
 
     const result = categoriesToCompare.map(cat => {
-      const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
+      const row = rawSheet.data.find((r: any) => r.indicator?.toLowerCase() === cat.toLowerCase());
       const rawTarget = row ? (row[targetKey] ?? row[effYoyTarget] ?? 0) : 0;
       const rawBase = row ? (row[baseKey] ?? row[effYoyBase] ?? 0) : 0;
       const valTarget = safeToTrillion(rawTarget);
@@ -272,7 +290,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
     });
 
     // Add Total Row to YoY Comparison
-    const totalRowData = rawSheet.data.find(r => r.indicator?.toLowerCase() === 'total' || r.indicator === 'Total');
+    const totalRowData = rawSheet.data.find((r: any) => r.indicator?.toLowerCase() === 'total' || r.indicator === 'Total');
     if (totalRowData) {
       const rawTotTarget = totalRowData[targetKey] ?? totalRowData[effYoyTarget] ?? 0;
       const rawTotBase = totalRowData[baseKey] ?? totalRowData[effYoyBase] ?? 0;
@@ -304,7 +322,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
     const shareKey = `${effShareYear}-${activeMonthLabel}`;
 
     let totalVal = 0;
-    const totalRowData = rawSheet.data.find(r => r.indicator?.toLowerCase() === 'total' || r.indicator === 'Total');
+    const totalRowData = rawSheet.data.find((r: any) => r.indicator?.toLowerCase() === 'total' || r.indicator === 'Total');
     if (totalRowData && (totalRowData[shareKey] !== undefined || totalRowData[effShareYear] !== undefined)) {
       totalVal = safeToTrillion(totalRowData[shareKey] ?? totalRowData[effShareYear] ?? 0);
     }
@@ -312,7 +330,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
     if (totalVal === 0) {
       // Sum selected categories
       selectedCategories.forEach(cat => {
-        const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
+        const row = rawSheet.data.find((r: any) => r.indicator?.toLowerCase() === cat.toLowerCase());
         if (row) {
           totalVal += safeToTrillion(row[shareKey] ?? row[effShareYear] ?? 0);
         }
@@ -320,7 +338,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
     }
 
     const items = selectedCategories.map(cat => {
-      const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
+      const row = rawSheet.data.find((r: any) => r.indicator?.toLowerCase() === cat.toLowerCase());
       const val = row ? safeToTrillion(row[shareKey] ?? row[effShareYear] ?? 0) : 0;
       let sharePct = 0;
       if (effShareYear === '2026' && row && typeof row['SHARE'] === 'number') {
@@ -348,7 +366,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
         periodLabel: `${p.year} (${p.month || 'Tahunan'})`
       };
       selectedCategories.forEach(cat => {
-        const row = rawSheet.data.find(r => r.indicator?.toLowerCase() === cat.toLowerCase());
+        const row = rawSheet.data.find((r: any) => r.indicator?.toLowerCase() === cat.toLowerCase());
         const rawVal = row ? (row[p.key] || row[p.year] || 0) : 0;
         entry[cat] = safeToTrillion(rawVal);
       });
@@ -356,10 +374,10 @@ export default function DpkView({ activeFile }: DpkViewProps) {
     });
   }, [activePeriods, selectedCategories, rawSheet]);
 
-  const giroRow = rawSheet.data.find(d => d.indicator?.toLowerCase() === 'giro');
-  const tabunganRow = rawSheet.data.find(d => d.indicator?.toLowerCase() === 'tabungan');
-  const depositoRow = rawSheet.data.find(d => d.indicator?.toLowerCase() === 'deposito');
-  const totalRow = rawSheet.data.find(d => d.indicator?.toLowerCase().includes('total') || d.indicator === 'Total');
+  const giroRow = rawSheet.data.find((d: any) => d.indicator?.toLowerCase() === 'giro');
+  const tabunganRow = rawSheet.data.find((d: any) => d.indicator?.toLowerCase() === 'tabungan');
+  const depositoRow = rawSheet.data.find((d: any) => d.indicator?.toLowerCase() === 'deposito');
+  const totalRow = rawSheet.data.find((d: any) => d.indicator?.toLowerCase().includes('total') || d.indicator === 'Total');
 
   const getSelectedYearsLabel = () => {
     if (selectedYears.length === 0) return 'Semua Tahun (2024 - 2026)';
@@ -541,10 +559,27 @@ export default function DpkView({ activeFile }: DpkViewProps) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {/* 1. Filter Rentang Tahun */}
+          {/* 1. Pilih Sheet / Kategori Sektor */}
+          <div className="flex flex-col space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">1. Sektor / Kategori Sheet</label>
+            <div className="relative">
+              <select
+                value={selectedSheetName}
+                onChange={(e) => setSelectedSheetName(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200/80 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 appearance-none focus:outline-none focus:ring-1 focus:ring-[#C61E1E] focus:border-[#C61E1E] cursor-pointer"
+              >
+                {availableSheets.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* 2. Filter Rentang Tahun */}
           <div className="flex flex-col space-y-1.5 relative">
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              1. Filter Tahun
+              2. Rentang Tahun
             </label>
             <div className="relative">
               <button
@@ -581,7 +616,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
 
                     <div className="border-t border-slate-50 my-1" />
 
-                    {allYears.map((y) => {
+                    {allYears.map((y: string) => {
                       const isSelected = selectedYears.includes(y);
                       return (
                         <button
@@ -657,7 +692,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
 
                     <div className="border-t border-slate-50 my-1" />
 
-                    {allMonths.map((m) => {
+                    {allMonths.map((m: string) => {
                       const isSelected = selectedMonths.includes(m);
                       return (
                         <button
@@ -1140,7 +1175,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
                     onChange={(e) => setYoyTargetYear(e.target.value)}
                     className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 font-bold focus:outline-none focus:ring-1 focus:ring-[#C61E1E] cursor-pointer"
                   >
-                    {allYears.map(y => (
+                    {allYears.map((y: string) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
@@ -1155,7 +1190,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
                     onChange={(e) => setYoyBaseYear(e.target.value)}
                     className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 font-bold focus:outline-none focus:ring-1 focus:ring-[#C61E1E] cursor-pointer"
                   >
-                    {['2023', '2024', '2025', '2026'].map(y => (
+                    {['2023', '2024', '2025', '2026'].map((y: string) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
@@ -1259,7 +1294,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
                   onChange={(e) => setShareTargetYear(e.target.value)}
                   className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 font-bold focus:outline-none focus:ring-1 focus:ring-[#C61E1E] cursor-pointer"
                 >
-                  {allYears.map(y => (
+                  {allYears.map((y: string) => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
@@ -1344,7 +1379,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
                 <th className="p-3.5 border-r border-slate-200 bg-slate-200/60 text-slate-800 text-left font-black w-60">
                   DPK
                 </th>
-                {activeYears.map(y => (
+                {activeYears.map((y: string) => (
                   <th key={y} className="p-3.5 border-r border-slate-200 bg-slate-100 font-black">
                     {y}
                   </th>
@@ -1355,7 +1390,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
               {/* Row 2 Header (Months / YOY / SHARE) */}
               <tr className="bg-slate-50 font-bold text-slate-600 border-b border-slate-200 text-center">
                 <th className="p-3 border-r border-slate-200 bg-slate-100/40"></th>
-                {activeYears.map(y => (
+                {activeYears.map((y: string) => (
                   <th key={y} className="p-3 border-r border-slate-200 bg-red-50/60 text-[#C61E1E] font-black">
                     {activeMonths.join(', ') || 'Mei'}
                   </th>
@@ -1366,7 +1401,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
             </thead>
             <tbody>
               {/* Filtered Data Rows */}
-              {filteredData.mainRows.map((row, idx) => (
+              {filteredData.mainRows.map((row: any, idx: number) => (
                 <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50/80 transition-colors">
                   <td className="p-3.5 border-r border-slate-200 font-bold text-slate-800">
                     <div className="flex items-center gap-2">
@@ -1374,7 +1409,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
                       <span>{row.indicator}</span>
                     </div>
                   </td>
-                  {activeYears.map(y => {
+                  {activeYears.map((y: string) => {
                     const periodKey = `${y}-${activeMonths[0] || 'Mei'}`;
                     const val = row[periodKey] ?? row[y];
                     return (
@@ -1407,7 +1442,7 @@ export default function DpkView({ activeFile }: DpkViewProps) {
                   <td className="p-3.5 border-r border-slate-200 font-black text-slate-900 bg-slate-200/40">
                     Total
                   </td>
-                  {activeYears.map(y => {
+                  {activeYears.map((y: string) => {
                     const periodKey = `${y}-${activeMonths[0] || 'Mei'}`;
                     const val = filteredData.totalRow?.[periodKey] ?? filteredData.totalRow?.[y];
                     return (
