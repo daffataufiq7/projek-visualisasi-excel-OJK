@@ -79,6 +79,29 @@ export const PRESET_USERS: UserProfile[] = [
 export function useDashboardState() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [customUsers, setCustomUsers] = useState<UserProfile[]>([]);
+
+  // Load custom users from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('finsight_custom_users');
+        if (raw) {
+          setCustomUsers(JSON.parse(raw));
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  const usersList = useMemo(() => {
+    const combined = [...PRESET_USERS];
+    customUsers.forEach(u => {
+      if (!combined.some(p => p.id.toLowerCase() === u.id.toLowerCase() || p.email.toLowerCase() === u.email.toLowerCase())) {
+        combined.push(u);
+      }
+    });
+    return combined;
+  }, [customUsers]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -87,9 +110,9 @@ export function useDashboardState() {
         try {
           const parsed = JSON.parse(savedUser);
           if (parsed && parsed.email) {
-            const foundPreset = PRESET_USERS.find(u => u.email.toLowerCase() === parsed.email.toLowerCase());
+            const foundUser = usersList.find(u => u.email.toLowerCase() === parsed.email.toLowerCase());
             setIsAuthenticated(true);
-            setCurrentUser(foundPreset || {
+            setCurrentUser(foundUser || {
               id: parsed.id || parsed.email,
               name: parsed.name || parsed.email,
               email: parsed.email,
@@ -101,15 +124,15 @@ export function useDashboardState() {
         } catch (e) {}
       }
     }
-  }, []);
+  }, [usersList]);
 
   const login = (nipOrEmail: string, password: string, name?: string, role?: string) => {
     const cleanInput = nipOrEmail.trim().toLowerCase();
-    const foundPreset = PRESET_USERS.find(u => u.email.toLowerCase() === cleanInput || u.id.toLowerCase() === cleanInput);
+    const foundUser = usersList.find(u => u.email.toLowerCase() === cleanInput || u.id.toLowerCase() === cleanInput);
     
     let userObj: UserProfile;
-    if (foundPreset) {
-      userObj = foundPreset;
+    if (foundUser) {
+      userObj = foundUser;
     } else {
       userObj = {
         id: cleanInput,
@@ -124,6 +147,45 @@ export function useDashboardState() {
     setIsAuthenticated(true);
     setCurrentUser(userObj);
     localStorage.setItem('finsight_auth_user', JSON.stringify(userObj));
+  };
+
+  const addUser = async (newUser: UserProfile) => {
+    const updatedCustom = [...customUsers.filter(u => u.id !== newUser.id && u.email !== newUser.email), newUser];
+    setCustomUsers(updatedCustom);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('finsight_custom_users', JSON.stringify(updatedCustom));
+    }
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customUsers: updatedCustom })
+      });
+    } catch (e) {
+      console.warn('Failed to sync custom users to server:', e);
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (userId.toLowerCase() === 'daffataufiq@ojk.go.id') {
+      alert('Akun Utama Admin Daffa Taufiq tidak dapat dihapus');
+      return;
+    }
+
+    const updatedCustom = customUsers.filter(u => u.id !== userId && u.email !== userId);
+    setCustomUsers(updatedCustom);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('finsight_custom_users', JSON.stringify(updatedCustom));
+    }
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customUsers: updatedCustom })
+      });
+    } catch (e) {
+      console.warn('Failed to sync custom users to server:', e);
+    }
   };
 
   const logout = (reason?: string) => {
@@ -835,6 +897,9 @@ export function useDashboardState() {
     clearAllHistory,
     loadHistoryItem,
     setFilterState,
+    usersList,
+    addUser,
+    deleteUser,
     handleSheetChange,
   };
 }

@@ -58,6 +58,8 @@ export interface UserProfile {
   role: string;
   avatarInitials: string;
   agency: string;
+  password?: string;
+  createdAt?: string;
 }
 
 export interface UploadHistoryItem {

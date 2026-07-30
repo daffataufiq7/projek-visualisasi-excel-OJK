@@ -1,11 +1,27 @@
 import React, { useState } from 'react';
 import { Settings as SettingsIcon, Save, Database, Key, Server, RefreshCw } from 'lucide-react';
+import { UserProfile } from '../types/dashboard';
+import UserManagement from './UserManagement';
 
-export default function Settings() {
+interface SettingsProps {
+  currentUser?: UserProfile | null;
+  usersList?: UserProfile[];
+  onAddUser?: (newUser: UserProfile) => void;
+  onDeleteUser?: (userId: string) => void;
+}
+
+export default function Settings({
+  currentUser,
+  usersList = [],
+  onAddUser = () => {},
+  onDeleteUser = () => {}
+}: SettingsProps) {
   const [apiUrl, setApiUrl] = useState('http://localhost:8000/api/v1/parse-excel');
   const [apiKey, setApiKey] = useState('ojk_jabar_sec_token_xxxxxxxx');
   const [threshold, setThreshold] = useState(70);
   const [saveStatus, setSaveStatus] = useState(false);
+
+  const isAdmin = currentUser?.email?.toLowerCase() === 'daffataufiq@ojk.go.id' || currentUser?.role?.toLowerCase().includes('admin');
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,7 +33,18 @@ export default function Settings() {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-soft p-6 space-y-6 w-full max-w-3xl mx-auto">
+    <div className="space-y-8 w-full max-w-4xl mx-auto">
+      {/* ADMIN USER MANAGEMENT MODULE */}
+      {isAdmin && (
+        <UserManagement
+          usersList={usersList}
+          onAddUser={onAddUser}
+          onDeleteUser={onDeleteUser}
+          currentAdminEmail={currentUser?.email}
+        />
+      )}
+
+      {/* SYSTEM CONFIGURATION CARD */}
       <div className="flex items-center gap-2 border-b border-slate-50 pb-4">
         <SettingsIcon size={18} className="text-[#C61E1E]" />
         <div>

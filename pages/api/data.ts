@@ -11,6 +11,7 @@ const DATA_FILE_PATH = process.env.VERCEL || process.env.NODE_ENV === 'productio
 let serverState: {
   activeFileIds: { [category: string]: string };
   history: any[];
+  customUsers: any[];
 } = {
   activeFileIds: {
     bank_umum: 'default-mock-bank',
@@ -18,7 +19,8 @@ let serverState: {
     dpk_portofolio: 'default-mock-dpk',
     undisbursed_loan: 'default-mock-undisbursed',
   },
-  history: []
+  history: [],
+  customUsers: []
 };
 
 // Load initial state from file cache if present
@@ -30,7 +32,8 @@ function loadFromFile() {
       if (parsed && typeof parsed === 'object') {
         serverState = {
           activeFileIds: parsed.activeFileIds || serverState.activeFileIds,
-          history: Array.isArray(parsed.history) ? parsed.history : []
+          history: Array.isArray(parsed.history) ? parsed.history : [],
+          customUsers: Array.isArray(parsed.customUsers) ? parsed.customUsers : []
         };
       }
     }
@@ -66,14 +69,15 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       const userHistory = serverState.history.filter(h => !h.userId || h.userId === userId);
       return res.status(200).json({
         activeFileIds: serverState.activeFileIds,
-        history: userHistory
+        history: userHistory,
+        customUsers: serverState.customUsers
       });
     }
     return res.status(200).json(serverState);
   }
 
   if (req.method === 'POST') {
-    const { historyItem, activeFileIds, userId } = req.body || {};
+    const { historyItem, activeFileIds, customUsers, userId } = req.body || {};
     
     if (historyItem) {
       const itemWithUser = {
@@ -91,6 +95,10 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         ...serverState.activeFileIds,
         ...activeFileIds
       };
+    }
+
+    if (Array.isArray(customUsers)) {
+      serverState.customUsers = customUsers;
     }
 
     saveToFile();

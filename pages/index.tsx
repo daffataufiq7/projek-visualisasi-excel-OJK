@@ -49,6 +49,9 @@ export default function Home() {
     loadHistoryItem,
     setFilterState,
     handleSheetChange,
+    usersList,
+    addUser,
+    deleteUser,
   } = useDashboardState();
 
   // Unified filter change handler
@@ -356,7 +359,12 @@ export default function Home() {
       case 'pengaturan':
         return (
           <motion.div {...pageTransition}>
-            <Settings />
+            <Settings
+              currentUser={currentUser}
+              usersList={usersList}
+              onAddUser={addUser}
+              onDeleteUser={deleteUser}
+            />
           </motion.div>
         );
 
