@@ -133,6 +133,12 @@ export default function AiAnalysisCards({
               </span>
             </div>
 
+            {/* Banner Fokus Analisis */}
+            <div className="bg-red-50/50 border border-red-100/80 px-3 py-1.5 rounded-xl text-[10px] font-extrabold text-[#C61E1E] flex items-center gap-1.5">
+              <span>🎯 Fokus Analisis:</span>
+              <span className="font-semibold text-slate-700">Kesehatan Likuiditas (LDR), Kualitas Kredit (NPL), dan Skala Aset/DPK</span>
+            </div>
+
             {/* Quick Metrics */}
             <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-center font-mono">
               <div>
@@ -154,26 +160,26 @@ export default function AiAnalysisCards({
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Pertumbuhan Intermediasi:</strong> Total penyaluran kredit perbankan tercatat sebesar <strong>Rp {bankUmumData.kredit} Triliun</strong> didukung penghimpunan DPK sebesar <strong>Rp {bankUmumData.dpk} Triliun</strong>.
+                  <strong>Skala Intermediasi:</strong> Total penyaluran kredit perbankan tercatat sebesar <strong>Rp {bankUmumData.kredit} Triliun</strong> didukung penghimpunan DPK sebesar <strong>Rp {bankUmumData.dpk} Triliun</strong>.
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Kesehatan Likuiditas (LDR):</strong> Rasio LDR berada pada tingkat ideal <strong>{computedLdr}%</strong>, mencerminkan kemampuan bank mengalirkan dana simpanan masyarakat ke dalam sektor riil secara efisien.
+                  <strong>Kesehatan Likuiditas (LDR):</strong> Rasio LDR berada pada tingkat ideal <strong>{computedLdr}%</strong>, mencerminkan efisiensi penyerapan dana simpanan ke sektor riil.
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Kualitas Aset (NPL):</strong> Rasio NPL terjaga aman di posisi <strong>{computedNpl}%</strong> (di bawah batas maksimum regulasi 5.0%), menandakan manajemen risiko kredit berjalan efektif.
+                  <strong>Kualitas Aset (NPL):</strong> Rasio NPL terjaga aman di posisi <strong>{computedNpl}%</strong> (di bawah batas regulasi 5.0%), menandakan risiko kredit terkendali baik.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="bg-red-50/60 border border-red-100 p-2.5 rounded-2xl text-[11px] font-semibold text-[#C61E1E] flex items-center justify-between mt-2">
-            <span>Kesimpulan: Struktur keuangan perbankan berada dalam kondisi solid & ekspansif.</span>
+            <span>📌 Rangkuman AI: Struktur keuangan perbankan berada dalam kondisi solid & ekspansif.</span>
           </div>
         </motion.div>
 
@@ -199,6 +205,12 @@ export default function AiAnalysisCards({
               </span>
             </div>
 
+            {/* Banner Fokus Analisis */}
+            <div className="bg-blue-50/50 border border-blue-100/80 px-3 py-1.5 rounded-xl text-[10px] font-extrabold text-blue-700 flex items-center gap-1.5">
+              <span>🎯 Fokus Analisis:</span>
+              <span className="font-semibold text-slate-700">Sektor Kredit Terbanyak (Modal Kerja / Investasi / Konsumsi) & Proporsi Alokasi</span>
+            </div>
+
             {/* Quick Metrics */}
             <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-center font-mono">
               <div>
@@ -220,26 +232,26 @@ export default function AiAnalysisCards({
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-blue-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Dominasi Portofolio:</strong> Kredit <strong>{dominantKredit}</strong> memegang pangsa terbesar sebesar <strong>Rp {dominantKreditVal} Triliun ({dominantKreditShare}%)</strong> dari total portofolio pinjaman.
+                  <strong>Sektor Kredit Terbanyak:</strong> Kredit <strong>{dominantKredit}</strong> memegang porsi terbanyak sebesar <strong>Rp {dominantKreditVal} Triliun ({dominantKreditShare}%)</strong>.
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-blue-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Dukungan Kapasitas Usaha:</strong> Penyaluran Kredit Investasi sebesar <strong>Rp {kreditData.investasi} Triliun ({shareInv}%)</strong> mencerminkan optimisme para pelaku usaha dalam melakukan ekspansi jangka panjang.
+                  <strong>Kapasitas Ekspansi (Investasi):</strong> Kredit Investasi tercatat <strong>Rp {kreditData.investasi} Triliun ({shareInv}%)</strong> menopang proyek jangka panjang.
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-blue-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Likuiditas Operasional:</strong> Kredit Modal Kerja sebesar <strong>Rp {kreditData.modalKerja} Triliun ({shareMk}%)</strong> aktif menopang perputaran kas operasional bisnis harian regional.
+                  <strong>Likuiditas Operasional (Modal Kerja):</strong> Kredit Modal Kerja sebesar <strong>Rp {kreditData.modalKerja} Triliun ({shareMk}%)</strong> membiayai perputaran usahawan.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="bg-blue-50/60 border border-blue-100 p-2.5 rounded-2xl text-[11px] font-semibold text-blue-700 flex items-center justify-between mt-2">
-            <span>Kesimpulan: Penyaluran kredit didorong kuat oleh sektor {dominantKredit}.</span>
+            <span>📌 Rangkuman AI: Penyaluran kredit didorong kuat oleh porsi terbesar di sektor {dominantKredit}.</span>
           </div>
         </motion.div>
 
@@ -265,6 +277,12 @@ export default function AiAnalysisCards({
               </span>
             </div>
 
+            {/* Banner Fokus Analisis */}
+            <div className="bg-emerald-50/50 border border-emerald-100/80 px-3 py-1.5 rounded-xl text-[10px] font-extrabold text-emerald-700 flex items-center gap-1.5">
+              <span>🎯 Fokus Analisis:</span>
+              <span className="font-semibold text-slate-700">Instrumen DPK Terbanyak & Efisiensi Rasio Dana Murah (CASA %)</span>
+            </div>
+
             {/* Quick Metrics */}
             <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-center font-mono">
               <div>
@@ -286,26 +304,26 @@ export default function AiAnalysisCards({
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Struktur Simpanan Utama:</strong> Portofolio <strong>{dominantDpk}</strong> menjadi kontributor utama simpanan dengan nilai <strong>Rp {dominantDpkVal} Triliun ({dominantDpkShare}%)</strong>.
+                  <strong>Instrumen DPK Terbanyak:</strong> Simpanan <strong>{dominantDpk}</strong> menjadi kontributor terbanyak sebesar <strong>Rp {dominantDpkVal} Triliun ({dominantDpkShare}%)</strong>.
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Efisiensi Dana Murah (CASA):</strong> Tingkat rasio CASA (Giro + Tabungan) mencapai <strong>{casaRatio}%</strong>, memberikan keunggulan biaya dana (Cost of Funds) yang kompetitif bagi perbankan.
+                  <strong>Efisiensi Dana Murah (CASA):</strong> Tingkat CASA (Giro + Tabungan) mencapai <strong>{casaRatio}%</strong>, menekan biaya dana (*Cost of Funds*).
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Ketahanan Deposito:</strong> Simpanan Berjangka (Deposito) tercatat sebesar <strong>Rp {dpkData.deposito} Triliun</strong> menjaga stabilitas likuiditas jangka menengah.
+                  <strong>Stabilitas Deposito:</strong> Deposito Berjangka sebesar <strong>Rp {dpkData.deposito} Triliun</strong> menjaga daya tahan likuiditas jangka menengah.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="bg-emerald-50/60 border border-emerald-100 p-2.5 rounded-2xl text-[11px] font-semibold text-emerald-700 flex items-center justify-between mt-2">
-            <span>Kesimpulan: Struktur DPK didominasi dana murah (CASA) yang efisien.</span>
+            <span>📌 Rangkuman AI: Struktur simpanan didominasi instrumen dana murah (CASA) yang efisien.</span>
           </div>
         </motion.div>
 
@@ -331,6 +349,12 @@ export default function AiAnalysisCards({
               </span>
             </div>
 
+            {/* Banner Fokus Analisis */}
+            <div className="bg-amber-50/50 border border-amber-100/80 px-3 py-1.5 rounded-xl text-[10px] font-extrabold text-amber-700 flex items-center gap-1.5">
+              <span>🎯 Fokus Analisis:</span>
+              <span className="font-semibold text-slate-700">Komitmen Kredit Belum Ditarik & Potensi Pencairan Ruang Usaha</span>
+            </div>
+
             {/* Quick Metrics */}
             <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 text-center font-mono">
               <div>
@@ -352,26 +376,26 @@ export default function AiAnalysisCards({
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-amber-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Komitmen Terparkir:</strong> Fasilitas kredit yang telah disetujui namun belum ditarik mencapai <strong>Rp {totalUndisbursed.toFixed(1)} Triliun</strong>.
+                  <strong>Total Komitmen Terparkir:</strong> Fasilitas kredit disetujui namun belum ditarik mencapai <strong>Rp {totalUndisbursed.toFixed(1)} Triliun</strong>.
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-amber-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Potensi Realisasi Modal Kerja:</strong> Porsi terbesar berada pada komitmen Modal Kerja <strong>Rp {undisbursedData.modalKerja} Triliun ({shareUndisbursedMk}%)</strong>.
+                  <strong>Potensi Pencairan Modal Kerja:</strong> Porsi komitmen terbesar ada pada Modal Kerja <strong>Rp {undisbursedData.modalKerja} Triliun ({shareUndisbursedMk}%)</strong>.
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={14} className="text-amber-500 shrink-0 mt-0.5" />
                 <p>
-                  <strong>Pencairan Kredit Investasi:</strong> Komitmen fasilitas Investasi tercatat sebesar <strong>Rp {undisbursedData.investasi} Triliun ({shareUndisbursedInv}%)</strong> yang siap dicairkan sesuai tahapan proyek.
+                  <strong>Pencairan Kredit Investasi:</strong> Komitmen fasilitas Investasi sebesar <strong>Rp {undisbursedData.investasi} Triliun ({shareUndisbursedInv}%)</strong> siap dicairkan bertahap.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="bg-amber-50/60 border border-amber-100 p-2.5 rounded-2xl text-[11px] font-semibold text-amber-800 flex items-center justify-between mt-2">
-            <span>Kesimpulan: Komitmen kredit siap cair berpotensi mendorong pertumbuhan kredit mendatang.</span>
+            <span>📌 Rangkuman AI: Komitmen kredit siap cair berpotensi mendorong pertumbuhan penarikan pinjaman mendatang.</span>
           </div>
         </motion.div>
 
