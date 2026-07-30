@@ -11,24 +11,29 @@ import {
 const LOCAL_STORAGE_HISTORY_KEY = 'finsight_upload_history';
 const LOCAL_STORAGE_ACTIVE_IDS_KEY = 'finsight_active_file_ids';
 const LOCAL_STORAGE_DELETED_IDS_KEY = 'finsight_deleted_file_ids';
+
+// Per-user key helpers — isolate each user's data in localStorage
+const historyKey = (userId?: string) => userId ? `${LOCAL_STORAGE_HISTORY_KEY}_${userId}` : LOCAL_STORAGE_HISTORY_KEY;
+const activeIdsKey = (userId?: string) => userId ? `${LOCAL_STORAGE_ACTIVE_IDS_KEY}_${userId}` : LOCAL_STORAGE_ACTIVE_IDS_KEY;
+const deletedIdsKey = (userId?: string) => userId ? `${LOCAL_STORAGE_DELETED_IDS_KEY}_${userId}` : LOCAL_STORAGE_DELETED_IDS_KEY;
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes auto logout on idle
 
-const getDeletedIds = (): string[] => {
+const getDeletedIds = (userId?: string): string[] => {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_IDS_KEY);
+    const raw = localStorage.getItem(deletedIdsKey(userId));
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     return [];
   }
 };
 
-const recordDeletedId = (id: string) => {
+const recordDeletedId = (id: string, userId?: string) => {
   if (typeof window === 'undefined') return;
   try {
-    const current = getDeletedIds();
+    const current = getDeletedIds(userId);
     if (!current.includes(id)) {
-      localStorage.setItem(LOCAL_STORAGE_DELETED_IDS_KEY, JSON.stringify([...current, id]));
+      localStorage.setItem(deletedIdsKey(userId), JSON.stringify([...current, id]));
     }
   } catch (e) {}
 };
@@ -120,10 +125,14 @@ export function useDashboardState() {
               avatarInitials: (parsed.name || parsed.email).slice(0, 2).toUpperCase(),
               agency: parsed.agency || 'OJK'
             });
+            // After restoring session, fetch per-user state from API + localStorage
+            const uid = parsed.id || parsed.email;
+            fetchServerState(uid);
           }
         } catch (e) {}
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usersList]);
 
   const login = (nipOrEmail: string, password: string, name?: string, role?: string) => {
@@ -144,6 +153,25 @@ export function useDashboardState() {
       };
     }
     
+    const uid = userObj.id || userObj.email;
+
+    // Immediately restore this user's saved activeFileIds from their own localStorage partition
+    const savedActiveIds = localStorage.getItem(activeIdsKey(uid));
+    if (savedActiveIds) {
+      try {
+        const parsed = JSON.parse(savedActiveIds);
+        setActiveFileIds(prev => ({ ...prev, ...parsed }));
+      } catch (e) {}
+    } else {
+      // Reset to defaults so no leftover IDs from previous user bleed through
+      setActiveFileIds({
+        bank_umum: 'default-mock-bank',
+        kredit_jenis: 'default-mock-kredit',
+        dpk_portofolio: 'default-mock-dpk',
+        undisbursed_loan: 'default-mock-undisbursed',
+      });
+    }
+
     setIsAuthenticated(true);
     setCurrentUser(userObj);
     localStorage.setItem('finsight_auth_user', JSON.stringify(userObj));
@@ -189,6 +217,14 @@ export function useDashboardState() {
   };
 
   const logout = (reason?: string) => {
+    // Reset in-memory state so the next user starts clean
+    setHistory([...defaultMockItems]);
+    setActiveFileIds({
+      bank_umum: 'default-mock-bank',
+      kredit_jenis: 'default-mock-kredit',
+      dpk_portofolio: 'default-mock-dpk',
+      undisbursed_loan: 'default-mock-undisbursed',
+    });
     setIsAuthenticated(false);
     setCurrentUser(null);
     localStorage.removeItem('finsight_auth_user');
@@ -364,28 +400,32 @@ export function useDashboardState() {
 
   // Sync with Server API (/api/data) to align Localhost & Ngrok users in real-time,
   // while preserving local user uploads on Vercel/production!
-  const fetchServerState = useCallback(async () => {
+  // Data is now fully partitioned per-user via userId-scoped localStorage keys.
+  const fetchServerState = useCallback(async (forUserId?: string) => {
     try {
-      const res = await fetch('/api/data');
+      const uid = forUserId;
+      const res = await fetch(uid ? `/api/data?userId=${encodeURIComponent(uid)}` : '/api/data');
       if (res.ok) {
         const data = await res.json();
         const serverHistory: UploadHistoryItem[] = data.history || [];
-        const serverActiveFileIds = data.activeFileIds || {};
 
-        const deletedIds = getDeletedIds();
+        const deletedIds = getDeletedIds(uid);
         const isNotDeleted = (h: any) => h && h.id && !deletedIds.includes(h.id);
+        const isMock = (id: string) => ['default-mock-bank','default-mock-kredit','default-mock-dpk','default-mock-undisbursed','default-mock'].includes(id);
 
-        // Read local user uploads from IndexedDB & localStorage
+        // Read per-user uploads from IndexedDB & user-scoped localStorage
         const dbItems = await loadHistoryFromDB();
-        const storedLocalHistoryRaw = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
-        let localUserUploads: UploadHistoryItem[] = dbItems.filter((h: any) => !h.isSample && isNotDeleted(h));
+        const storedLocalHistoryRaw = uid ? localStorage.getItem(historyKey(uid)) : null;
+
+        // Only keep items that belong to this user (or have no userId — legacy)
+        let localUserUploads: UploadHistoryItem[] = dbItems.filter((h: any) =>
+          !h.isSample && isNotDeleted(h) && (!h.userId || !uid || h.userId === uid)
+        );
 
         if (storedLocalHistoryRaw) {
           try {
             const parsed = JSON.parse(storedLocalHistoryRaw) as UploadHistoryItem[];
-            const lsUploads = parsed.filter(
-              h => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed' && isNotDeleted(h)
-            );
+            const lsUploads = parsed.filter(h => !isMock(h.id) && isNotDeleted(h));
             lsUploads.forEach(item => {
               if (!localUserUploads.some(d => d.id === item.id)) {
                 localUserUploads.push(item);
@@ -394,8 +434,9 @@ export function useDashboardState() {
           } catch (e) {}
         }
 
+        // Only include server history items belonging to this user
         const cleanedServerHistory = serverHistory.filter(
-          (h: any) => h.id !== 'default-mock' && h.id !== 'default-mock-bank' && h.id !== 'default-mock-kredit' && h.id !== 'default-mock-dpk' && h.id !== 'default-mock-undisbursed' && isNotDeleted(h)
+          (h: any) => !isMock(h.id) && isNotDeleted(h) && (!h.userId || !uid || h.userId === uid)
         );
 
         // Map existing fileData from memory & IndexedDB to prevent losing parsed Excel files
@@ -403,41 +444,38 @@ export function useDashboardState() {
         dbItems.forEach((h: any) => { if (h?.id && h?.fileData) fileDataMap.set(h.id, h.fileData); });
         history.forEach(h => { if (h?.id && h?.fileData) fileDataMap.set(h.id, h.fileData); });
 
-        // Merge local user uploads with server history (local uploads take precedence)
-        const mergedUserHistoryMap = new Map<string, UploadHistoryItem>();
+        // Merge: local uploads take precedence over server history
+        const mergedMap = new Map<string, UploadHistoryItem>();
         [...cleanedServerHistory, ...localUserUploads].forEach(item => {
           if (item && item.id && isNotDeleted(item)) {
-            // Restore fileData if missing from JSON server response
             if (!item.fileData && fileDataMap.has(item.id)) {
               item.fileData = fileDataMap.get(item.id)!;
             }
-            mergedUserHistoryMap.set(item.id, item);
+            mergedMap.set(item.id, item);
           }
         });
-        const mergedUserUploads = Array.from(mergedUserHistoryMap.values());
-
+        const mergedUserUploads = Array.from(mergedMap.values());
         const combinedHistory = [...defaultMockItems, ...mergedUserUploads];
         setHistory(combinedHistory);
 
-        // Restore active IDs from IndexedDB & localStorage
-        const dbActiveIds = await loadActiveIdsFromDB();
-        const storedActiveIdsRaw = localStorage.getItem(LOCAL_STORAGE_ACTIVE_IDS_KEY);
+        // Restore per-user activeFileIds from their own localStorage partition
+        const dbActiveIds = uid ? await loadActiveIdsFromDB(uid) : await loadActiveIdsFromDB();
+        const storedActiveIdsRaw = uid ? localStorage.getItem(activeIdsKey(uid)) : localStorage.getItem(LOCAL_STORAGE_ACTIVE_IDS_KEY);
         let localActiveIds = dbActiveIds || {};
         if (storedActiveIdsRaw) {
           try { localActiveIds = { ...localActiveIds, ...JSON.parse(storedActiveIdsRaw) }; } catch(e){}
         }
 
-        setActiveFileIds(prev => ({
-          ...prev,
-          ...serverActiveFileIds,
-          ...localActiveIds
-        }));
+        if (Object.keys(localActiveIds).length > 0) {
+          setActiveFileIds(prev => ({ ...prev, ...localActiveIds }));
+        }
 
+        // Persist merged history back into the user-scoped partition
         saveHistoryToDB(combinedHistory);
-        try {
-          localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(combinedHistory));
-        } catch (e) {
-          // Ignore localStorage quota errors silently since IndexedDB safely holds the data
+        if (uid) {
+          try {
+            localStorage.setItem(historyKey(uid), JSON.stringify(combinedHistory));
+          } catch (e) {}
         }
       }
     } catch (err) {
@@ -485,34 +523,60 @@ export function useDashboardState() {
       }
     });
 
-    // Load history from IndexedDB & localStorage for immediate render
+    // Load initial data from IndexedDB (no per-user filtering yet, user may not be set at mount time)
     loadHistoryFromDB().then(dbItems => {
-      const storedHistory = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
-      let userItems: UploadHistoryItem[] = dbItems.filter((h: any) => !h.isSample);
-      if (storedHistory) {
-        try {
-          const parsed = JSON.parse(storedHistory) as UploadHistoryItem[];
-          const lsItems = parsed.filter(h => !h.isSample);
-          lsItems.forEach(item => {
-            if (!userItems.some(d => d.id === item.id)) {
-              userItems.push(item);
-            }
-          });
-        } catch (e) {}
-      }
+      const userItems: UploadHistoryItem[] = dbItems.filter((h: any) => !h.isSample);
       setHistory([...defaultMockItems, ...userItems]);
     });
 
-    // Sync with Server API immediately
+    // Sync with Server API immediately (no userId yet — will re-sync when user logs in)
     fetchServerState();
 
-    // Set up auto-sync polling every 3 seconds
+    // Set up auto-sync polling every 10 seconds
     const syncInterval = setInterval(() => {
+      // Pass currentUser at call time via ref to avoid stale closure
       fetchServerState();
-    }, 3000);
+    }, 10000);
 
     return () => clearInterval(syncInterval);
   }, [defaultMockItems, fetchServerState]);
+
+  // Re-fetch per-user data whenever the logged-in user changes
+  // This restores uploaded files & active selections after login
+  useEffect(() => {
+    if (currentUser) {
+      const uid = currentUser.id || currentUser.email;
+      fetchServerState(uid);
+
+      // Also restore per-user activeFileIds from their own localStorage partition
+      const savedActiveIds = localStorage.getItem(activeIdsKey(uid));
+      if (savedActiveIds) {
+        try {
+          const parsed = JSON.parse(savedActiveIds);
+          setActiveFileIds(prev => ({ ...prev, ...parsed }));
+        } catch (e) {}
+      }
+
+      // Restore per-user history from their own localStorage partition
+      const savedHistory = localStorage.getItem(historyKey(uid));
+      if (savedHistory) {
+        try {
+          const parsed = JSON.parse(savedHistory) as UploadHistoryItem[];
+          const userUploads = parsed.filter(h => !h.isSample && !h.id.startsWith('default-mock'));
+          if (userUploads.length > 0) {
+            setHistory(prev => {
+              const mockItems = prev.filter(h => h.isSample || h.id.startsWith('default-mock'));
+              const merged = new Map<string, UploadHistoryItem>();
+              mockItems.forEach(h => merged.set(h.id, h));
+              userUploads.forEach(h => merged.set(h.id, h));
+              return Array.from(merged.values());
+            });
+          }
+        } catch (e) {}
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   // Auto-populate filterState.yAxis (select all indicators) whenever the active file changes
   // This handles: server sync switching activeFileIds, loadHistoryItem, and initial load
@@ -594,20 +658,20 @@ export function useDashboardState() {
         const updatedHistory = [newItem, ...history.filter(h => h.name !== file.name)];
         setHistory(updatedHistory);
         saveHistoryToDB(updatedHistory);
+        const uid = currentUser?.id || currentUser?.email;
         try {
-          localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
-        } catch (e) {
-          // Ignore localStorage quota errors silently since IndexedDB safely holds the data
-        }
+          // Save to per-user partition so it survives logout/login
+          localStorage.setItem(historyKey(uid), JSON.stringify(updatedHistory));
+        } catch (e) {}
 
         const updatedActiveIds = {
           ...activeFileIds,
           [redirectTab]: newId,
         };
         setActiveFileIds(updatedActiveIds);
-        saveActiveIdsToDB(updatedActiveIds);
+        saveActiveIdsToDB(updatedActiveIds, uid);
         try {
-          localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(updatedActiveIds));
+          localStorage.setItem(activeIdsKey(uid), JSON.stringify(updatedActiveIds));
         } catch (e) {}
 
         // Sync uploaded data to Next.js server so Ngrok users see it instantly!
@@ -698,7 +762,8 @@ export function useDashboardState() {
       return;
     }
 
-    recordDeletedId(id);
+    const uid = currentUser?.id || currentUser?.email;
+    recordDeletedId(id, uid);
 
     const category = targetItem?.category || 'bank_umum';
     const updatedHistory = history.filter(item => item.id !== id);
@@ -706,7 +771,7 @@ export function useDashboardState() {
     setHistory(updatedHistory);
     saveHistoryToDB(updatedHistory);
     try {
-      localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+      localStorage.setItem(historyKey(uid), JSON.stringify(updatedHistory));
     } catch (e) {}
 
     try {
@@ -725,10 +790,11 @@ export function useDashboardState() {
         ...activeFileIds,
         [category]: defaultId
       };
+      const uid = currentUser?.id || currentUser?.email;
       setActiveFileIds(newActive);
-      saveActiveIdsToDB(newActive);
+      saveActiveIdsToDB(newActive, uid);
       try {
-        localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
+        localStorage.setItem(activeIdsKey(uid), JSON.stringify(newActive));
       } catch (e) {}
 
       const mockItem = updatedHistory.find(h => h.id === defaultId);
@@ -773,10 +839,11 @@ export function useDashboardState() {
         [category]: id,
         [redirectTab]: id
       };
+      const uid = currentUser?.id || currentUser?.email;
       setActiveFileIds(newActive);
-      saveActiveIdsToDB(newActive);
+      saveActiveIdsToDB(newActive, uid);
       try {
-        localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
+        localStorage.setItem(activeIdsKey(uid), JSON.stringify(newActive));
       } catch (e) {}
 
       try {
@@ -835,10 +902,11 @@ export function useDashboardState() {
         activeSheetName: sheetName
       };
       const updatedHistory = history.map(h => h.id === item.id ? { ...h, fileData: updatedFileData } : h);
+      const uid = currentUser?.id || currentUser?.email;
       setHistory(updatedHistory);
       saveHistoryToDB(updatedHistory);
       try {
-        localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+        localStorage.setItem(historyKey(uid), JSON.stringify(updatedHistory));
       } catch (e) {}
     }
 
@@ -872,10 +940,11 @@ export function useDashboardState() {
       updatedHistory = history.filter(h => h.isSample || h.id.startsWith('default-mock'));
     }
 
+    const uid = currentUser?.id || currentUser?.email;
     setHistory(updatedHistory);
     await saveHistoryToDB(updatedHistory);
     try {
-      localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updatedHistory));
+      localStorage.setItem(historyKey(uid), JSON.stringify(updatedHistory));
     } catch (e) {}
 
     const categoriesToReset = category ? [category] : ['bank_umum', 'kredit_jenis', 'dpk_portofolio', 'undisbursed_loan'];
@@ -889,9 +958,9 @@ export function useDashboardState() {
     });
 
     setActiveFileIds(newActive);
-    await saveActiveIdsToDB(newActive);
+    await saveActiveIdsToDB(newActive, uid);
     try {
-      localStorage.setItem(LOCAL_STORAGE_ACTIVE_IDS_KEY, JSON.stringify(newActive));
+      localStorage.setItem(activeIdsKey(uid), JSON.stringify(newActive));
     } catch (e) {}
 
     try {
