@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ActiveFile, FilterState, UploadHistoryItem, UserProfile } from '../types/dashboard';
 import { parseExcelFile, generateMockFile } from '../services/excelService';
 import { 
@@ -11,6 +11,7 @@ import {
 const LOCAL_STORAGE_HISTORY_KEY = 'finsight_upload_history';
 const LOCAL_STORAGE_ACTIVE_IDS_KEY = 'finsight_active_file_ids';
 const LOCAL_STORAGE_DELETED_IDS_KEY = 'finsight_deleted_file_ids';
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes auto logout on idle
 
 const getDeletedIds = (): string[] => {
   if (typeof window === 'undefined') return [];
@@ -125,11 +126,42 @@ export function useDashboardState() {
     localStorage.setItem('finsight_auth_user', JSON.stringify(userObj));
   };
 
-  const logout = () => {
+  const logout = (reason?: string) => {
     setIsAuthenticated(false);
     setCurrentUser(null);
     localStorage.removeItem('finsight_auth_user');
+    if (reason && typeof window !== 'undefined') {
+      localStorage.setItem('finsight_logout_reason', reason);
+    }
   };
+
+  // Auto Logout on 15 minutes Inactivity (Mouse, Keyboard, Scroll, Touch)
+  const lastActivityRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    lastActivityRef.current = Date.now();
+
+    const handleUserActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach((evt) => window.addEventListener(evt, handleUserActivity));
+
+    const checkInterval = setInterval(() => {
+      if (Date.now() - lastActivityRef.current >= INACTIVITY_TIMEOUT_MS) {
+        clearInterval(checkInterval);
+        logout('inactivity');
+      }
+    }, 10000); // Check every 10 seconds
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, handleUserActivity));
+      clearInterval(checkInterval);
+    };
+  }, [isAuthenticated]);
 
   const [activeFileIds, setActiveFileIds] = useState<{ [category: string]: string }>({
     bank_umum: 'default-mock-bank',

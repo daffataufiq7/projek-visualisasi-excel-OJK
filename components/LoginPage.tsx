@@ -58,7 +58,18 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedUserEmail, setSelectedUserEmail] = useState('daffataufiq@ojk.go.id');
   const [error, setError] = useState<string | null>(null);
+  const [inactivityNotice, setInactivityNotice] = useState<string | null>(null);
   const [showAbout, setShowAbout] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const reason = localStorage.getItem('finsight_logout_reason');
+      if (reason === 'inactivity') {
+        setInactivityNotice('Sesi Anda telah berakhir secara otomatis karena tidak ada aktivitas selama 15 menit. Silakan masuk kembali.');
+        localStorage.removeItem('finsight_logout_reason');
+      }
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,6 +249,18 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 })}
               </div>
             </div>
+
+            {/* Inactivity Auto-Logout Notice */}
+            {inactivityNotice && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl text-xs font-semibold flex items-center gap-2.5 shadow-xs"
+              >
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 animate-pulse" />
+                <span>{inactivityNotice}</span>
+              </motion.div>
+            )}
 
             {/* Error Message */}
             {error && (
