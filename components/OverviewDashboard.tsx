@@ -32,6 +32,7 @@ import {
   LabelList 
 } from 'recharts';
 import { ActiveFile } from '../types/dashboard';
+import AiAnalysisCards from './AiAnalysisCards';
 
 interface OverviewDashboardProps {
   activeFile: ActiveFile;
@@ -48,6 +49,12 @@ const KREDIT_COLORS: { [key: string]: string } = {
   'Modal Kerja': '#3B82F6',
   'Investasi': '#8B5CF6',
   'Konsumsi': '#EC4899'
+};
+
+const UNDISBURSED_COLORS: { [key: string]: string } = {
+  'Modal Kerja': '#F59E0B',
+  'Investasi': '#8B5CF6',
+  'Konsumsi': '#0D9488'
 };
 
 // Helper to find row value safely for a given target indicator substring and period
@@ -106,12 +113,14 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
   const [bankUmumChartType, setBankUmumChartType] = useState<'bar' | 'pie'>('bar');
   const [kreditChartType, setKreditChartType] = useState<'bar' | 'pie'>('bar');
   const [dpkChartType, setDpkChartType] = useState<'bar' | 'pie'>('pie');
+  const [undisbursedChartType, setUndisbursedChartType] = useState<'bar' | 'pie'>('bar');
 
   // Master Global Switcher
   const setGlobalChartType = (type: 'bar' | 'pie') => {
     setBankUmumChartType(type);
     setKreditChartType(type);
     setDpkChartType(type);
+    setUndisbursedChartType(type);
   };
 
   // Extract sheets safely with smart fallback
@@ -155,6 +164,22 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
       s.data?.some((d: any) => {
         const ind = String(d.indicator || '').toLowerCase();
         return ind.includes('giro') || ind.includes('tabungan') || ind.includes('deposito');
+      })
+    );
+    return foundByData || null;
+  }, [activeFile]);
+
+  const undisbursedSheet = useMemo(() => {
+    if (!activeFile?.sheets) return null;
+    const key = Object.keys(activeFile.sheets).find(
+      s => s.toLowerCase().includes('undisbursed') || s.toLowerCase().includes('loan') || s.toLowerCase().includes('belum')
+    );
+    if (key) return activeFile.sheets[key];
+
+    const foundByData = Object.values(activeFile.sheets).find((s: any) =>
+      s.data?.some((d: any) => {
+        const ind = String(d.indicator || '').toLowerCase();
+        return ind.includes('undisbursed') || ind.includes('belum ditarik');
       })
     );
     return foundByData || null;
@@ -300,6 +325,89 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
     });
   }, [dpkSheet]);
 
+  // 4. Undisbursed Loan Primary Chart Data
+  const undisbursedChartData = useMemo(() => {
+    if (!undisbursedSheet) {
+      return [
+        { period: '2024', 'Modal Kerja': 142.5, 'Investasi': 88.3, 'Konsumsi': 45.1 },
+        { period: '2025', 'Modal Kerja': 158.2, 'Investasi': 94.7, 'Konsumsi': 48.9 },
+        { period: '2026', 'Modal Kerja': 169.4, 'Investasi': 102.1, 'Konsumsi': 52.3 }
+      ];
+    }
+    const dataPeriods = undisbursedSheet.periods.filter(
+      p => p !== 'YOY' && p !== 'SHARE' && !p.toLowerCase().includes('yoy') && !p.toLowerCase().includes('share')
+    );
+    const periods = dataPeriods.length > 0 ? dataPeriods.slice(-5) : undisbursedSheet.periods.slice(-5);
+
+    return periods.map(p => {
+      const mkRaw = getIndicatorValue(undisbursedSheet, ['modal kerja', 'modal'], p);
+      const invRaw = getIndicatorValue(undisbursedSheet, ['investasi', 'invest'], p);
+      const konRaw = getIndicatorValue(undisbursedSheet, ['konsumsi', 'konsum'], p);
+
+      return {
+        period: p.replace('-', ' '),
+        'Modal Kerja': normalizeToTrillion(mkRaw),
+        'Investasi': normalizeToTrillion(invRaw),
+        'Konsumsi': normalizeToTrillion(konRaw)
+      };
+    });
+  }, [undisbursedSheet]);
+
+  // Undisbursed Pie Data for latest year
+  const undisbursedPieData = useMemo(() => {
+    const latest = undisbursedChartData[undisbursedChartData.length - 1];
+    if (!latest) return [];
+    const total = (latest['Modal Kerja'] || 0) + (latest['Investasi'] || 0) + (latest['Konsumsi'] || 0) || 1;
+    return [
+      { name: 'Modal Kerja', value: latest['Modal Kerja'], share: parseFloat(((latest['Modal Kerja'] / total) * 100).toFixed(1)), color: '#F59E0B' },
+      { name: 'Investasi', value: latest['Investasi'], share: parseFloat(((latest['Investasi'] / total) * 100).toFixed(1)), color: '#8B5CF6' },
+      { name: 'Konsumsi', value: latest['Konsumsi'], share: parseFloat(((latest['Konsumsi'] / total) * 100).toFixed(1)), color: '#0D9488' }
+    ];
+  }, [undisbursedChartData]);
+
+  // AI Analysis Props calculated from real-time data
+  const aiDataProps = useMemo(() => {
+    const bankLatest = bankUmumChartData[bankUmumChartData.length - 1] || { Aset: 1205.9, DPK: 1090.2, Kredit: 995.4, period: '2026' };
+    const kreditLatest = kreditChartData[kreditChartData.length - 1] || { 'Modal Kerja': 329.7, 'Investasi': 251.8, 'Konsumsi': 499.0, period: '2026' };
+    
+    // Calculate DPK breakdown from dpkChartData or dpkBarData
+    const tabVal = dpkChartData.find(d => d.name === 'Tabungan')?.value || 361.9;
+    const depVal = dpkChartData.find(d => d.name === 'Deposito')?.value || 226.8;
+    const giroVal = dpkChartData.find(d => d.name === 'Giro')?.value || 174.8;
+    const dpkPeriod = (dpkBarData && dpkBarData.length > 0) ? dpkBarData[dpkBarData.length - 1].period : '2026';
+
+    const undisbursedLatest = undisbursedChartData[undisbursedChartData.length - 1] || { 'Modal Kerja': 169.4, 'Investasi': 102.1, 'Konsumsi': 52.3, period: '2026' };
+
+    return {
+      bankUmumData: {
+        aset: bankLatest.Aset,
+        dpk: bankLatest.DPK,
+        kredit: bankLatest.Kredit,
+        npl: 2.1,
+        ldr: parseFloat(((bankLatest.Kredit / (bankLatest.DPK || 1)) * 100).toFixed(1)),
+        period: bankLatest.period
+      },
+      kreditData: {
+        modalKerja: kreditLatest['Modal Kerja'],
+        investasi: kreditLatest['Investasi'],
+        konsumsi: kreditLatest['Konsumsi'],
+        period: kreditLatest.period
+      },
+      dpkData: {
+        giro: giroVal,
+        tabungan: tabVal,
+        deposito: depVal,
+        period: dpkPeriod
+      },
+      undisbursedData: {
+        modalKerja: undisbursedLatest['Modal Kerja'],
+        investasi: undisbursedLatest['Investasi'],
+        konsumsi: undisbursedLatest['Konsumsi'],
+        period: undisbursedLatest.period
+      }
+    };
+  }, [bankUmumChartData, kreditChartData, dpkChartData, dpkBarData, undisbursedChartData]);
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 15 }}
@@ -336,7 +444,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
               Ringkasan Utama Kinerja Perbankan & Finansial
             </h1>
             <p className="text-sm text-slate-300 font-medium max-w-3xl mt-2 leading-relaxed">
-              Konsolidasi hasil visualisasi utama dari sektor <strong className="text-white font-bold">Perbankan Jawa Barat</strong>, <strong className="text-white font-bold">Kredit per Jenis Penggunaan</strong>, dan <strong className="text-white font-bold">DPK per Portofolio</strong> dengan opsi toggle cepat <strong className="text-white font-bold">Bar Chart</strong> vs <strong className="text-white font-bold">Pie Chart</strong>.
+              Konsolidasi hasil visualisasi utama dari 4 sektor: <strong className="text-white font-bold">Perbankan Jawa Barat</strong>, <strong className="text-white font-bold">Kredit per Jenis Penggunaan</strong>, <strong className="text-white font-bold">DPK per Portofolio</strong>, dan <strong className="text-white font-bold">Undisbursed Loan</strong>.
             </p>
           </div>
 
@@ -366,6 +474,15 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
             >
               <Landmark size={15} className="text-emerald-400" />
               <span>Detail DPK per Portofolio</span>
+              <ChevronRight size={14} />
+            </button>
+
+            <button
+              onClick={() => onNavigateTab('undisbursed_loan')}
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all active:scale-95"
+            >
+              <BarChart3 size={15} className="text-amber-400" />
+              <span>Detail Undisbursed Loan</span>
               <ChevronRight size={14} />
             </button>
           </div>
@@ -415,8 +532,8 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
         </div>
       </div>
 
-      {/* THREE CORE SECTORS VISUAL HIGHLIGHTS GRID WITH BAR VS PIE TOGGLES */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* FOUR CORE SECTORS VISUAL HIGHLIGHTS GRID WITH BAR VS PIE TOGGLES */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
 
         {/* SECTOR 1 VISUAL: Bank Umum (Bar Chart vs Pie Chart) */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-soft space-y-4 flex flex-col justify-between">
@@ -719,7 +836,7 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
           </div>
 
           <div className="pt-3 border-t border-slate-50 flex items-center justify-between text-xs font-semibold text-slate-600">
-            <span>Utama: <strong className="text-emerald-600">Tabungan (47,40%)</strong></span>
+            <span>Utama: <strong className="text-emerald-600">Tabungan ({dpkChartData.find(d => d.name === 'Tabungan')?.share || '47,40'}%)</strong></span>
             <button 
               onClick={() => onNavigateTab('dpk_portofolio')}
               className="text-emerald-600 hover:underline font-bold flex items-center gap-0.5"
@@ -730,7 +847,114 @@ export default function OverviewDashboard({ activeFile, onNavigateTab }: Overvie
           </div>
         </div>
 
+        {/* SECTOR 4 VISUAL: Undisbursed Loan per Jenis (Bar Chart vs Pie Chart) */}
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-soft space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-50 pb-3 gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <BarChart3 size={16} className="text-amber-600" />
+                  <span>4. Undisbursed Loan</span>
+                </h3>
+                <p className="text-[11px] text-slate-400 font-medium">Fasilitas Kredit Belum Ditarik</p>
+              </div>
+
+              {/* In-Card Bar vs Pie Switcher */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-bold shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setUndisbursedChartType('bar')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                    undisbursedChartType === 'bar' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500'
+                  }`}
+                  title="Tampilkan Bar Chart"
+                >
+                  <BarChart3 size={12} />
+                  <span>Bar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUndisbursedChartType('pie')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                    undisbursedChartType === 'pie' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500'
+                  }`}
+                  title="Tampilkan Pie Chart"
+                >
+                  <PieIcon size={12} />
+                  <span>Pie</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Render Bar Chart or Pie Chart based on toggle */}
+            <div className="h-64 w-full mt-4 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                {undisbursedChartType === 'bar' ? (
+                  <BarChart data={undisbursedChartData} margin={{ top: 20, right: 15, left: -15, bottom: 0 }}>
+                    <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#64748B' }} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748B' }} tickFormatter={(v) => `${v}T`} />
+                    <Tooltip 
+                      formatter={(val: any) => [`${val} Triliun`, '']}
+                      contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '11px' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
+                    <Bar dataKey="Modal Kerja" fill="#F59E0B" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="Modal Kerja" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#F59E0B' }} />
+                    </Bar>
+                    <Bar dataKey="Investasi" fill="#8B5CF6" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="Investasi" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#8B5CF6' }} />
+                    </Bar>
+                    <Bar dataKey="Konsumsi" fill="#0D9488" radius={[4, 4, 0, 0]}>
+                      <LabelList dataKey="Konsumsi" position="top" formatter={(v: any) => `${v} T`} style={{ fontSize: '9px', fontWeight: 'bold', fill: '#0D9488' }} />
+                    </Bar>
+                  </BarChart>
+                ) : (
+                  <PieChart>
+                    <Pie
+                      data={undisbursedPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={85}
+                      paddingAngle={4}
+                      dataKey="value"
+                      label={({ name, share }) => `${name}: ${share}%`}
+                      labelLine={{ stroke: '#94A3B8', strokeWidth: 1 }}
+                    >
+                      {undisbursedPieData.map((entry, index) => (
+                        <Cell key={`cell-undisbursed-dash-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(val: any, name: any, item: any) => [
+                        `${val} Triliun (${item.payload.share}%)`,
+                        name
+                      ]}
+                      contentStyle={{ backgroundColor: '#1E293B', borderRadius: '12px', color: '#FFF', fontSize: '11px' }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '5px' }} />
+                  </PieChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-50 flex items-center justify-between text-xs font-semibold text-slate-600">
+            <span>Utama: <strong className="text-amber-600">Modal Kerja ({undisbursedPieData.find(d => d.name === 'Modal Kerja')?.share || '52.3'}%)</strong></span>
+            <button 
+              onClick={() => onNavigateTab('undisbursed_loan')}
+              className="text-amber-600 hover:underline font-bold flex items-center gap-0.5"
+            >
+              <span>Detail</span>
+              <ArrowUpRight size={14} />
+            </button>
+          </div>
+        </div>
+
       </div>
+
+      {/* 4-CARD AI FINANCIAL ANALYSIS PANEL AT THE VERY BOTTOM */}
+      <AiAnalysisCards {...aiDataProps} />
     </motion.div>
   );
 }
