@@ -61,16 +61,28 @@ export const config = {
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
+    const userId = req.query.userId as string | undefined;
+    if (userId) {
+      const userHistory = serverState.history.filter(h => !h.userId || h.userId === userId);
+      return res.status(200).json({
+        activeFileIds: serverState.activeFileIds,
+        history: userHistory
+      });
+    }
     return res.status(200).json(serverState);
   }
 
   if (req.method === 'POST') {
-    const { historyItem, activeFileIds } = req.body || {};
+    const { historyItem, activeFileIds, userId } = req.body || {};
     
     if (historyItem) {
+      const itemWithUser = {
+        ...historyItem,
+        userId: historyItem.userId || userId
+      };
       serverState.history = [
-        historyItem,
-        ...serverState.history.filter(h => h.id !== historyItem.id && h.name !== historyItem.name)
+        itemWithUser,
+        ...serverState.history.filter(h => h.id !== itemWithUser.id && h.name !== itemWithUser.name)
       ];
     }
 
@@ -90,18 +102,22 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch(e){}
     }
-    const { id, clearAll, category } = body || {};
+    const { id, clearAll, category, userId } = body || {};
 
     if (clearAll) {
       if (category) {
-        serverState.history = serverState.history.filter((h: any) => h.category !== category);
+        serverState.history = serverState.history.filter((h: any) => h.category !== category || (userId && h.userId && h.userId !== userId));
         const defaultId = category === 'kredit_jenis' ? 'default-mock-kredit'
           : category === 'dpk_portofolio' ? 'default-mock-dpk'
           : category === 'undisbursed_loan' ? 'default-mock-undisbursed'
           : 'default-mock-bank';
         serverState.activeFileIds[category] = defaultId;
       } else {
-        serverState.history = [];
+        if (userId) {
+          serverState.history = serverState.history.filter((h: any) => h.userId && h.userId !== userId);
+        } else {
+          serverState.history = [];
+        }
         serverState.activeFileIds = {
           bank_umum: 'default-mock-bank',
           kredit_jenis: 'default-mock-kredit',

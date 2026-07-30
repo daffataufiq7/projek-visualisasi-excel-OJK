@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { ActiveFile, FilterState, UploadHistoryItem } from '../types/dashboard';
+import { ActiveFile, FilterState, UploadHistoryItem, UserProfile } from '../types/dashboard';
 import { parseExcelFile, generateMockFile } from '../services/excelService';
 import { 
   saveHistoryToDB, 
@@ -32,9 +32,52 @@ const recordDeletedId = (id: string) => {
   } catch (e) {}
 };
 
+export const PRESET_USERS: UserProfile[] = [
+  {
+    id: 'daffataufiq@ojk.go.id',
+    name: 'Daffa Taufiq',
+    email: 'daffataufiq@ojk.go.id',
+    role: 'Admin OJK Jabar',
+    avatarInitials: 'DT',
+    agency: 'UNY'
+  },
+  {
+    id: 'ratukhansa@ojk.go.id',
+    name: 'Ratukhansa Salsabila',
+    email: 'ratukhansa@ojk.go.id',
+    role: 'Analis Perbankan OJK',
+    avatarInitials: 'RS',
+    agency: 'ITB'
+  },
+  {
+    id: 'naufalhanif@ojk.go.id',
+    name: 'Naufal Hanif R.',
+    email: 'naufalhanif@ojk.go.id',
+    role: 'Analis Perbankan OJK',
+    avatarInitials: 'NH',
+    agency: 'UNY'
+  },
+  {
+    id: 'anggabaihaki@ojk.go.id',
+    name: 'Angga Baihaki Y.',
+    email: 'anggabaihaki@ojk.go.id',
+    role: 'Analis Perbankan OJK',
+    avatarInitials: 'AB',
+    agency: 'UNY'
+  },
+  {
+    id: 'banganazwa@ojk.go.id',
+    name: 'Bunga Nazwa S.',
+    email: 'banganazwa@ojk.go.id',
+    role: 'Analis Perbankan OJK',
+    avatarInitials: 'BN',
+    agency: 'Telkom'
+  }
+];
+
 export function useDashboardState() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; role: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -42,12 +85,16 @@ export function useDashboardState() {
       if (savedUser) {
         try {
           const parsed = JSON.parse(savedUser);
-          if (parsed) {
+          if (parsed && parsed.email) {
+            const foundPreset = PRESET_USERS.find(u => u.email.toLowerCase() === parsed.email.toLowerCase());
             setIsAuthenticated(true);
-            setCurrentUser({
-              name: parsed.name || 'Daffa Taufiq',
-              email: parsed.email || parsed.nipOrEmail || 'daffataufiq@ojk.go.id',
-              role: parsed.role || 'Admin OJK Jabar'
+            setCurrentUser(foundPreset || {
+              id: parsed.id || parsed.email,
+              name: parsed.name || parsed.email,
+              email: parsed.email,
+              role: parsed.role || 'Staf Analis OJK',
+              avatarInitials: (parsed.name || parsed.email).slice(0, 2).toUpperCase(),
+              agency: parsed.agency || 'OJK'
             });
           }
         } catch (e) {}
@@ -55,13 +102,24 @@ export function useDashboardState() {
     }
   }, []);
 
-  const login = (nipOrEmail: string, password: string, name: string = 'Daffa Taufiq', role: string = 'Admin OJK Jabar') => {
-    const userObj = {
-      name: name || (nipOrEmail.toLowerCase().includes('daffa') ? 'Daffa Taufiq' : nipOrEmail),
-      email: nipOrEmail,
-      role: role || 'Admin OJK Jabar',
-      loginTime: new Date().toISOString()
-    };
+  const login = (nipOrEmail: string, password: string, name?: string, role?: string) => {
+    const cleanInput = nipOrEmail.trim().toLowerCase();
+    const foundPreset = PRESET_USERS.find(u => u.email.toLowerCase() === cleanInput || u.id.toLowerCase() === cleanInput);
+    
+    let userObj: UserProfile;
+    if (foundPreset) {
+      userObj = foundPreset;
+    } else {
+      userObj = {
+        id: cleanInput,
+        name: name || (cleanInput.includes('daffa') ? 'Daffa Taufiq' : nipOrEmail),
+        email: nipOrEmail,
+        role: role || 'Staf Analis OJK',
+        avatarInitials: nipOrEmail.slice(0, 2).toUpperCase(),
+        agency: 'OJK'
+      };
+    }
+    
     setIsAuthenticated(true);
     setCurrentUser(userObj);
     localStorage.setItem('finsight_auth_user', JSON.stringify(userObj));
@@ -126,11 +184,17 @@ export function useDashboardState() {
     });
   };
 
+  const userHistory = useMemo(() => {
+    if (!currentUser) return history;
+    const currentUserId = currentUser.id || currentUser.email;
+    return history.filter(h => h.isSample || h.id.startsWith('default-mock') || h.userId === currentUserId || !h.userId);
+  }, [history, currentUser]);
+
   const activeFile = useMemo(() => {
     const activeId = activeFileIds[activeCategory];
-    const item = history.find(h => h.id === activeId);
+    const item = userHistory.find(h => h.id === activeId);
     return item?.fileData || null;
-  }, [activeCategory, activeFileIds, history]);
+  }, [activeCategory, activeFileIds, userHistory]);
 
   // Unified mock item definitions
   const defaultMockItems = useMemo(() => {
@@ -419,6 +483,7 @@ export function useDashboardState() {
           status: 'success',
           fileData: parsedFile,
           category: redirectTab,
+          userId: currentUser?.id || currentUser?.email,
         };
 
         const updatedHistory = [newItem, ...history.filter(h => h.name !== file.name)];
@@ -723,7 +788,7 @@ export function useDashboardState() {
     login,
     logout,
     activeFile,
-    history,
+    history: userHistory,
     activeTab,
     sidebarCollapsed,
     loading,

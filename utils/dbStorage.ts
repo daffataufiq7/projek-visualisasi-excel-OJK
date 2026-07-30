@@ -68,24 +68,26 @@ export async function loadHistoryFromDB(): Promise<any[]> {
   }
 }
 
-export async function saveActiveIdsToDB(activeIds: any): Promise<void> {
+export async function saveActiveIdsToDB(activeIds: any, userId?: string): Promise<void> {
   try {
     const db = await openDB();
     const tx = db.transaction(SETTINGS_STORE, 'readwrite');
     const store = tx.objectStore(SETTINGS_STORE);
-    store.put(activeIds, 'activeFileIds');
+    const key = userId ? `activeFileIds_${userId}` : 'activeFileIds';
+    store.put(activeIds, key);
   } catch (err) {
     console.warn('IndexedDB saveActiveIds error:', err);
   }
 }
 
-export async function loadActiveIdsFromDB(): Promise<any | null> {
+export async function loadActiveIdsFromDB(userId?: string): Promise<any | null> {
   try {
     const db = await openDB();
     const tx = db.transaction(SETTINGS_STORE, 'readonly');
     const store = tx.objectStore(SETTINGS_STORE);
+    const key = userId ? `activeFileIds_${userId}` : 'activeFileIds';
     return new Promise((resolve) => {
-      const req = store.get('activeFileIds');
+      const req = store.get(key);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });

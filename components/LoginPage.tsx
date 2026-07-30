@@ -7,12 +7,56 @@ interface LoginPageProps {
   onLogin: (nipOrEmail: string, password: string) => void;
 }
 
+const PRESET_LOGIN_USERS = [
+  {
+    name: 'Daffa Taufiq',
+    email: 'daffataufiq@ojk.go.id',
+    role: 'Admin OJK Jabar',
+    initials: 'DT',
+    univ: 'UNY',
+    badgeColor: 'bg-red-500 text-white'
+  },
+  {
+    name: 'Ratukhansa Salsabila',
+    email: 'ratukhansa@ojk.go.id',
+    role: 'Analis OJK (ITB)',
+    initials: 'RS',
+    univ: 'ITB',
+    badgeColor: 'bg-blue-600 text-white'
+  },
+  {
+    name: 'Naufal Hanif R.',
+    email: 'naufalhanif@ojk.go.id',
+    role: 'Analis OJK (UNY)',
+    initials: 'NH',
+    univ: 'UNY',
+    badgeColor: 'bg-emerald-600 text-white'
+  },
+  {
+    name: 'Angga Baihaki Y.',
+    email: 'anggabaihaki@ojk.go.id',
+    role: 'Analis OJK (UNY)',
+    initials: 'AB',
+    univ: 'UNY',
+    badgeColor: 'bg-amber-600 text-white'
+  },
+  {
+    name: 'Bunga Nazwa S.',
+    email: 'banganazwa@ojk.go.id',
+    role: 'Analis OJK (Telkom)',
+    initials: 'BN',
+    univ: 'Telkom',
+    badgeColor: 'bg-purple-600 text-white'
+  }
+];
+
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [nipOrEmail, setNipOrEmail] = useState('daffataufiq@ojk.go.id');
   const [password, setPassword] = useState('admin123');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedUserEmail, setSelectedUserEmail] = useState('daffataufiq@ojk.go.id');
   const [error, setError] = useState<string | null>(null);
   const [showAbout, setShowAbout] = useState(false);
 
@@ -33,15 +77,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setTimeout(() => {
       onLogin(nipOrEmail, password);
       setIsSubmitting(false);
-    }, 600);
+    }, 500);
   };
 
-  const handleQuickAdminLogin = () => {
-    setNipOrEmail('daffataufiq@ojk.go.id');
-    setPassword('admin123');
+  const handleSelectUser = (user: typeof PRESET_LOGIN_USERS[0]) => {
+    setSelectedUserEmail(user.email);
+    setNipOrEmail(user.email);
+    setPassword(user.email.includes('daffa') ? 'admin123' : 'user123');
     setIsSubmitting(true);
     setTimeout(() => {
-      onLogin('daffataufiq@ojk.go.id', 'admin123');
+      onLogin(user.email, user.email.includes('daffa') ? 'admin123' : 'user123');
       setIsSubmitting(false);
     }, 400);
   };
@@ -150,28 +195,48 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </p>
             </div>
 
-            {/* Quick Login Admin Info Pill */}
-            <div className="my-5 bg-red-50/90 border border-red-100 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#C61E1E] text-white flex items-center justify-center font-extrabold text-xs shrink-0 shadow-sm">
-                  DT
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-slate-800 truncate">Daffa Taufiq</span>
-                    <span className="bg-[#C61E1E] text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">Admin OJK</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 font-medium truncate">daffataufiq@ojk.go.id</p>
-                </div>
+            {/* Quick Login Account Picker */}
+            <div className="my-4 space-y-1.5">
+              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>Pilih Akun Pengguna (Quick Login)</span>
+                <span className="text-[10px] text-[#C61E1E] font-bold">5 Akun Tersedia</span>
+              </label>
+              <div className="grid grid-cols-1 gap-1.5 max-h-[145px] overflow-y-auto pr-1">
+                {PRESET_LOGIN_USERS.map((user) => {
+                  const isSelected = nipOrEmail.toLowerCase() === user.email.toLowerCase();
+                  return (
+                    <button
+                      key={user.email}
+                      type="button"
+                      onClick={() => handleSelectUser(user)}
+                      className={`w-full p-2.5 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'bg-red-50/90 border-[#C61E1E] shadow-sm' 
+                          : 'bg-slate-50/80 border-slate-200/80 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-7 h-7 rounded-xl ${user.badgeColor} flex items-center justify-center font-extrabold text-[10px] shrink-0 shadow-sm`}>
+                          {user.initials}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-800 truncate">{user.name}</span>
+                            <span className="text-[9px] font-black text-slate-400">({user.univ})</span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-medium truncate">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] font-bold text-[#C61E1E] bg-white px-2 py-0.5 rounded-lg border border-red-100 shadow-2xs">
+                          {user.role}
+                        </span>
+                        <ChevronRight size={13} className="text-slate-400" />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-              <button
-                type="button"
-                onClick={handleQuickAdminLogin}
-                className="bg-[#C61E1E] hover:bg-red-700 active:bg-red-800 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all shadow-sm shrink-0 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Masuk Admin</span>
-                <ChevronRight size={13} />
-              </button>
             </div>
 
             {/* Error Message */}

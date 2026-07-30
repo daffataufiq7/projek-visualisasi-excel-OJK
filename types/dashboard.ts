@@ -51,6 +51,15 @@ export interface FilterState {
   selectedMonths?: string[];
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatarInitials: string;
+  agency: string;
+}
+
 export interface UploadHistoryItem {
   id: string;
   name: string;
@@ -61,6 +70,7 @@ export interface UploadHistoryItem {
   status: 'success' | 'failed';
   errorMessage?: string;
   fileData?: ActiveFile;
-  category?: string; // 'bank_umum' | 'kredit_jenis' | 'dpk_portofolio'
+  category?: string; // 'bank_umum' | 'kredit_jenis' | 'dpk_portofolio' | 'undisbursed_loan'
   isSample?: boolean;
+  userId?: string;
 }

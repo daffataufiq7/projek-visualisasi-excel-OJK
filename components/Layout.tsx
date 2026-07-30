@@ -22,7 +22,7 @@ import {
   LogOut
 } from 'lucide-react';
 import Logo from './Logo';
-import { ActiveFile } from '../types/dashboard';
+import { ActiveFile, UserProfile } from '../types/dashboard';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -31,7 +31,7 @@ interface LayoutProps {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
   activeFile: ActiveFile | null;
-  currentUser?: { name?: string; email?: string; role?: string; nipOrEmail?: string } | null;
+  currentUser?: UserProfile | null;
   onLogout?: () => void;
 }
 
@@ -172,12 +172,12 @@ export default function Layout({
           {!sidebarCollapsed ? (
             <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-100">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-[#C61E1E]/10 flex items-center justify-center text-[#C61E1E] font-bold shrink-0">
-                  <User size={15} />
+                <div className="w-8 h-8 rounded-xl bg-[#C61E1E] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                  {currentUser?.avatarInitials || (currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'DT')}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate text-slate-800">
-                    {currentUser?.name || currentUser?.nipOrEmail || 'Daffa Taufiq'}
+                    {currentUser?.name || currentUser?.email || 'Daffa Taufiq'}
                   </p>
                   <p className="text-[10px] text-slate-500 font-semibold truncate">
                     {currentUser?.role || 'Admin OJK Jabar'}
